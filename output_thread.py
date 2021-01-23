@@ -110,7 +110,7 @@ class Zone():
 class ZoneLoggingThread(Thread):
     def __init__(self,zone):
         self.zone = zone
-        self.interval = 2
+        self.interval = 10
         super().__init__()
 
     def run(self):
@@ -128,7 +128,7 @@ class ZoneValveThread(Thread):
         self.output_gpio = output_gpio
         self.config_gpio(self.output_gpio)
         self.r = redis.Redis(host='localhost',port=6379,db=0) #the host and port should be in a config
-        self.interval = 1
+        self.interval = 5
         self.cycle = 0
         self.duration = 10 * 60 / self.interval
         super().__init__()
@@ -143,6 +143,7 @@ class ZoneValveThread(Thread):
             topic = f'{self.sensor_path}/target_heatingcooling_state'
             message = self.r.get(topic)
             if message == None:
+                time.sleep(self.interval)
                 continue
 
             value = int(message.decode('utf-8'))
@@ -151,6 +152,7 @@ class ZoneValveThread(Thread):
             topic = f'{self.sensor_path}/control_value'
             message = self.r.get(topic)
             if message == None:
+                time.sleep(self.interval)
                 continue
 
             control_value = float(message.decode('utf-8'))
