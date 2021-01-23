@@ -1,0 +1,6 @@
+[Unit]
+Description=Heating Zone and Boiler Control
+
+[Service]
+User=boiler_relay_service
+ExecStart=/home/debian/boiler-relay/env/bin/python /home/debian/boiler-relay/boiler_relay.py
