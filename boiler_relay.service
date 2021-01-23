@@ -2,5 +2,8 @@
 Description=Heating Zone and Boiler Control
 
 [Service]
+Type=simple
 User=boiler_relay_service
 ExecStart=/home/debian/boiler-relay/env/bin/python /home/debian/boiler-relay/boiler_relay.py
+Restart=on-failure
+Environment=PYTHONUNBUFFERED=1
