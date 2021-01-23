@@ -142,11 +142,17 @@ class ZoneValveThread(Thread):
         while True:
             topic = f'{self.sensor_path}/target_heatingcooling_state'
             message = self.r.get(topic)
+            if message == None:
+                continue
+
             value = int(message.decode('utf-8'))
             target_heatingcooling_state = HeatingCoolingState(value)
 
             topic = f'{self.sensor_path}/control_value'
             message = self.r.get(topic)
+            if message == None:
+                continue
+
             control_value = float(message.decode('utf-8'))
 
             heating_cooling_state = HeatingCoolingState.OFF 

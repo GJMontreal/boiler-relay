@@ -1,6 +1,13 @@
 {"zones":[{"sensor_path":"/home/sensors/A1234",
-  "input_gpio":"P8_11",
-  "output_gpio":"P8_15",
+  "input_gpio":"P8_14",
+  "output_gpio":"P8_7",
   "name":"Bedrooms",
   "pid_interval":"10",
-  "control_interval":"10"}]}
+  "control_interval":"10"},
+	{"sensor_path":"/home/sensors/B5678",
+	"input_gpio":"P8_15",
+	"output_gpio":"P8_8",
+	"name":"Common",
+	"pid_interval":"10",
+	"control_interval":"10"}]
+}
