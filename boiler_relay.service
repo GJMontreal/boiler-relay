@@ -2,9 +2,13 @@
 Description=Heating Zone and Boiler Control
 
 [Service]
+After=redis.service
 Type=simple
 User=boiler_relay_service
 WorkingDirectory=/var/lib/boiler_relay
 ExecStart=/home/debian/boiler-relay/env/bin/python /home/debian/boiler-relay/boiler_relay.py
 Restart=on-failure
 Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
