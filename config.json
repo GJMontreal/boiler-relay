@@ -1,0 +1,6 @@
+{"zones":[{"sensor_path":"/home/sensors/A1234",
+  "input_gpio":"P8_11",
+  "output_gpio":"P8_15",
+  "name":"Bedrooms",
+  "pid_interval":"10",
+  "control_interval":"10"}]}
