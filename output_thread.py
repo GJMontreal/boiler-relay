@@ -11,6 +11,7 @@ import os
 
 TIME_CONSTANT = 60
 LOG_PATH = "/tmp/ramdisk/boiler-relay"
+ACTIVE_LOW = True
 
 Kp = 1
 Ki = 0.01
@@ -27,6 +28,10 @@ class BoilerThread(Thread):
     def config_gpio(self, gpio):
         print(f'configuring GPIO: {gpio} as Output')
         GPIO.setup(gpio, GPIO.OUT)
+        output = GPIO.LOW
+        if ACTIVE_LOW:
+            output = GPIO.HIGH
+        GPIO.output(gpio, output)
         GPIO.cleanup()
 
     def run(self):
@@ -38,7 +43,10 @@ class BoilerThread(Thread):
                 combined_state = combined_state or GPIO.input(zone.input_gpio)
 
             print(f'boiler {combined_state}')
-            GPIO.output(self.output_gpio, combined_state)
+            output_state = combined_state
+            if ACTIVE_LOW:
+                output_state = combined_state * -1 + 1
+            GPIO.output(self.output_gpio, output_state)
 
             time.sleep(self.interval)
 
@@ -74,6 +82,11 @@ class Zone():
     def config_gpio(self, gpio):
         print(f'configuring GPIO: {gpio} as Input')
         GPIO.setup(gpio, GPIO.IN)
+        Goutput = GPIO.LOW
+        if ACTIVE_LOW:
+            output = GPIO.HIGH
+        GPIO.output(gpio, output)
+        GPIO.cleanup()
 
     def write_row(self):
         p, i, d = self.pid_thread.pid.components
@@ -136,6 +149,10 @@ class ZoneValveThread(Thread):
     def config_gpio(self, gpio):
         print(f'configuring GPIO: {gpio} as Output')
         GPIO.setup(gpio, GPIO.OUT)
+        output = GPIO.LOW
+        if ACTIVE_LOW:
+            output = GPIO.HIGH
+        GPIO.output(gpio, output)
         GPIO.cleanup()
 
     def run(self):
@@ -168,7 +185,10 @@ class ZoneValveThread(Thread):
             
             #logging should be done to a file not stdout
             #print(f'{self.sensor_path} {self.thermostat.target_temperature} {self.thermostat.current_temperature} {self.cycle} {on_time} {heating_cooling_state.value} {control_value}')
-            GPIO.output(self.output_gpio,heating_cooling_state.value)
+            output = heating_cooling_state.value
+            if ACTIVE_LOW:
+                output = output * -1 + 1
+            GPIO.output(self.output_gpio,output)
             print(f'zone_valve {heating_cooling_state}')
             topic = f'{self.sensor_path}/heating_cooling_state'
             self.r.set(topic,heating_cooling_state.value)
