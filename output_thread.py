@@ -82,11 +82,7 @@ class Zone():
     def config_gpio(self, gpio):
         print(f'configuring GPIO: {gpio} as Input')
         GPIO.setup(gpio, GPIO.IN)
-        Goutput = GPIO.LOW
-        if ACTIVE_LOW:
-            output = GPIO.HIGH
-        GPIO.output(gpio, output)
-        GPIO.cleanup()
+       
 
     def write_row(self):
         p, i, d = self.pid_thread.pid.components
