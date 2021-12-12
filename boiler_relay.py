@@ -22,6 +22,7 @@ class ZoneConfig:
         self.input_gpio = dict['input_gpio']
         self.output_gpio = dict['output_gpio']
         self.name = dict['name']
+        self.active_low = dict['active_low']
         self.pid_interval = 5 #seconds
         self.control_interval = 10 #minutes
 
