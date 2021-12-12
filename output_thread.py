@@ -69,6 +69,7 @@ class Zone():
                                     self)) #not super keen about passing in self
         self.zone_valve_thread = ( ZoneValveThread(zone_config.sensor_path,
                                             zone_config.output_gpio,
+                                            zone_config.active_low,
                                             self))
 
         self.logging_thread = ZoneLoggingThread(self)
@@ -80,6 +81,7 @@ class Zone():
         self.target_temperature = 0
         self.current_temperature = 0
         self.last_sample_time = None
+        self.active_low = zone_config.active_low
 
     def start(self):
         self.pid_thread.start()
@@ -138,11 +140,12 @@ class ZoneLoggingThread(Thread):
 
 #this controls zone valve
 class ZoneValveThread(Thread):
-    def __init__(self, sensor_path, output_gpio, zone):
+    def __init__(self, sensor_path, output_gpio, active_low, zone):
         self.zone = zone
         self.sensor_path = sensor_path
         self.output_gpio = output_gpio
         self.config_gpio(self.output_gpio)
+        self.active_low = active_low
         self.r = redis.Redis(host='localhost',port=6379,db=0) #the host and port should be in a config
         self.interval = 5
         self.cycle = 0
@@ -153,7 +156,7 @@ class ZoneValveThread(Thread):
         print(f'configuring GPIO: {gpio} as Output')
         GPIO.setup(gpio, GPIO.OUT)
         output = GPIO.LOW
-        if ACTIVE_LOW:
+        if self.active_low:
             output = GPIO.HIGH
         GPIO.output(gpio, output)
         GPIO.cleanup()
@@ -189,7 +192,7 @@ class ZoneValveThread(Thread):
             #logging should be done to a file not stdout
             #print(f'{self.sensor_path} {self.thermostat.target_temperature} {self.thermostat.current_temperature} {self.cycle} {on_time} {heating_cooling_state.value} {control_value}')
             output = heating_cooling_state.value
-            if ACTIVE_LOW:
+            if self.active_low:
                 output = output * -1 + 1
             GPIO.output(self.output_gpio,output)
             print(f'zone_valve {heating_cooling_state}')
