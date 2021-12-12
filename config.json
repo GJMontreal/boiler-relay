@@ -6,7 +6,8 @@
             "output_gpio": "P8_7",
             "name": "Bedrooms",
             "pid_interval": "10",
-            "control_interval": "10"
+            "control_interval": "10",
+            "active_low": true
         },
         {
             "sensor_path": "/home/sensors/0x53FE",
@@ -14,15 +15,17 @@
             "output_gpio": "P8_9",
             "name": "Common",
             "pid_interval": "10",
-            "control_interval": "10"
+            "control_interval": "10",
+            "active_low": true
         },
         {
-            "sensor_path": "/home/sensors/C9123",
+            "sensor_path": "/home/sensors/0xE1AC",
             "input_gpio": "P8_18",
             "output_gpio": "P8_11",
             "name": "Study",
             "pid_interval": "10",
-            "control_interval": "10"
+            "control_interval": "10",
+            "active_low": true
         },
         {
             "sensor_path": "/home/sensors/0xA1DA",
@@ -30,7 +33,8 @@
             "output_gpio": "P8_10",
             "name": "Study",
             "pid_interval": "10",
-            "control_interval": "10"
+            "control_interval": "10",
+            "active_low": false
         }
     ],
     "boiler": {
