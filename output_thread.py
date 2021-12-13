@@ -144,8 +144,10 @@ class ZoneValveThread(Thread):
         self.zone = zone
         self.sensor_path = sensor_path
         self.output_gpio = output_gpio
-        self.config_gpio(self.output_gpio)
         self.active_low = active_low
+        
+        self.config_gpio(self.output_gpio)
+
         self.r = redis.Redis(host='localhost',port=6379,db=0) #the host and port should be in a config
         self.interval = 5
         self.cycle = 0
@@ -156,7 +158,7 @@ class ZoneValveThread(Thread):
         print(f'configuring GPIO: {gpio} as Output')
         GPIO.setup(gpio, GPIO.OUT)
         output = GPIO.LOW
-        if self.active_low:
+        if self.active_low == True:
             output = GPIO.HIGH
         GPIO.output(gpio, output)
         GPIO.cleanup()
