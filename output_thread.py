@@ -197,7 +197,7 @@ class ZoneValveThread(Thread):
             if self.active_low:
                 output = output * -1 + 1
             GPIO.output(self.output_gpio,output)
-            print(f'zone_valve {heating_cooling_state}')
+            print(f'zone_valve {self.zone.name} {heating_cooling_state}')
             topic = f'{self.sensor_path}/heating_cooling_state'
             self.r.set(topic,heating_cooling_state.value)
             self.r.publish(topic,heating_cooling_state.value)
