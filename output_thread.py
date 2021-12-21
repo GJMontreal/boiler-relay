@@ -201,8 +201,8 @@ class ZoneValveThread(Thread):
 
             for gpio in self.output_gpio:
                 GPIO.output(gpio, output)
-                
-            print(f'zone_valve {self.zone.name} {heating_cooling_state}\n')
+            
+            print(f'zone_valve {self.zone.name} {self.output_gpio} {heating_cooling_state}\n')
 
             topic = f'{self.sensor_path}/heating_cooling_state'
             self.r.set(topic,heating_cooling_state.value)
