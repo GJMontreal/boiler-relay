@@ -3,7 +3,9 @@
         {
             "sensor_path": "/home/sensors/0xFD69",
             "input_gpio": "P8_7",
-            "output_gpio": "P8_8",
+            "output_gpio": [
+                "P8_8"
+            ],
             "name": "Bedrooms",
             "pid_interval": "10",
             "control_interval": "10",
@@ -12,7 +14,10 @@
         {
             "sensor_path": "/home/sensors/0x53FE",
             "input_gpio": "P8_9",
-            "output_gpio": "P8_10",
+            "output_gpio": [
+                "P8_10",
+                "P8_14"
+            ],
             "name": "Common",
             "pid_interval": "10",
             "control_interval": "10",
@@ -21,7 +26,9 @@
         {
             "sensor_path": "/home/sensors/0xE1AC",
             "input_gpio": "P8_11",
-            "output_gpio": "P8_12",
+            "output_gpio": [
+                "P8_12"
+            ],
             "name": "Study",
             "pid_interval": "10",
             "control_interval": "10",
@@ -30,7 +37,9 @@
         {
             "sensor_path": "/home/sensors/0xA1DA",
             "input_gpio": "P8_15",
-            "output_gpio": "P8_14",
+            "output_gpio": [
+                "P8_16"
+            ],
             "name": "Kitchen",
             "pid_interval": "10",
             "control_interval": "10",
@@ -40,5 +49,12 @@
     "boiler": {
         "output_gpio": "P8_18",
         "control_interval": "10"
-    }
+    },
+    "inputs": [
+        "P8_7",
+        "P8_9",
+        "P8_11",
+        "P8_15",
+        "P8_17"
+    ]
 }

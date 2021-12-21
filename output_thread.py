@@ -146,7 +146,8 @@ class ZoneValveThread(Thread):
         self.output_gpio = output_gpio
         self.active_low = active_low
         
-        self.config_gpio(self.output_gpio)
+        for gpio in self.output_gpio:
+            self.config_gpio(gpio)
 
         self.r = redis.Redis(host='localhost',port=6379,db=0) #the host and port should be in a config
         self.interval = 5
@@ -196,8 +197,12 @@ class ZoneValveThread(Thread):
             output = heating_cooling_state.value
             if self.active_low:
                 output = output * -1 + 1
-            GPIO.output(self.output_gpio,output)
+
+            for gpio in self.output_gpio:
+                GPIO.output(gpio, output)
+                
             print(f'zone_valve {self.zone.name} {heating_cooling_state}\n')
+
             topic = f'{self.sensor_path}/heating_cooling_state'
             self.r.set(topic,heating_cooling_state.value)
             self.r.publish(topic,heating_cooling_state.value)
