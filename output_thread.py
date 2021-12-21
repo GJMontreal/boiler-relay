@@ -10,6 +10,7 @@ import json
 import time
 import redis 
 import Adafruit_BBIO.GPIO as GPIO
+# from gpio import GPIO
 from enum import Enum
 import csv
 from simple_pid import PID
