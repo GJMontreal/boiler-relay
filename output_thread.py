@@ -46,7 +46,7 @@ class BoilerThread(Thread):
             #read each of the inputs
             combined_state = 0
             for zone in self.zones:
-                print(f'reading {zone.input_gpio} {GPIO.input(zone.input_gpio)}')
+                print(f'reading {zone.name} {zone.input_gpio} {GPIO.input(zone.input_gpio)}')
                 combined_state = combined_state or GPIO.input(zone.input_gpio)
 
             print(f'boiler {combined_state}')
@@ -197,7 +197,7 @@ class ZoneValveThread(Thread):
             if self.active_low:
                 output = output * -1 + 1
             GPIO.output(self.output_gpio,output)
-            print(f'zone_valve {self.zone.name} {heating_cooling_state}')
+            print(f'zone_valve {self.zone.name} {heating_cooling_state}\n')
             topic = f'{self.sensor_path}/heating_cooling_state'
             self.r.set(topic,heating_cooling_state.value)
             self.r.publish(topic,heating_cooling_state.value)
