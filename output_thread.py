@@ -29,7 +29,7 @@ class BoilerThread(Thread):
     def __init__(self,zones):
         self.zones = zones
         self.interval = 5
-        self.output_gpio = 'P8_8'
+        self.output_gpio = 'P8_18'
         self.config_gpio(self.output_gpio)
         super().__init__()
 
