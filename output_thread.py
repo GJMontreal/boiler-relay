@@ -243,7 +243,7 @@ class PIDThread(Thread):
         self.r = redis.Redis(host='localhost',port=6379,db=0)
 
         self.pid = self.init_pid()
-        self.control_value = 0
+        self.control_value = float(0.0)
         super().__init__()
 
     def init_pid(self):
@@ -324,7 +324,7 @@ class PIDThread(Thread):
             self.r.set(topic, control_value)
             self.r.publish(topic, control_value)
             
-            print(f'{self.sensor_path} {self.control_value} {self.current_temperature} {self.setpoint}')
+            print(f'pid {self.zone.name} {self.control_value:.3f} {self.current_temperature} {self.setpoint}')
             # if self.zone.last_sample_time != None:
             #     self.write_row()
 
