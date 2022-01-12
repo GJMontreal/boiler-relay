@@ -194,6 +194,13 @@ class ZoneValveThread(Thread):
                 
                 heating_cooling_state = HeatingCoolingState.HEAT
             
+            topic = f'{self.sensor_path}/boost'
+            message = self.r.get(topic)
+            if message is not None:
+                bool_value = bool(message.decode('utf-8'))
+                if bool_value == True:
+                    heating_cooling_state = HeatingCoolingState.HEAT
+
             #logging should be done to a file not stdout
             #print(f'{self.sensor_path} {self.thermostat.target_temperature} {self.thermostat.current_temperature} {self.cycle} {on_time} {heating_cooling_state.value} {control_value}')
             output = heating_cooling_state.value
@@ -324,7 +331,7 @@ class PIDThread(Thread):
             self.r.set(topic, control_value)
             self.r.publish(topic, control_value)
             
-            print(f'pid {self.zone.name} {self.control_value:.3f} {self.current_temperature} {self.setpoint}')
+            print(f'pid {self.zone.name} {control_value:.3f} {self.current_temperature} {self.setpoint}')
             # if self.zone.last_sample_time != None:
             #     self.write_row()
 
