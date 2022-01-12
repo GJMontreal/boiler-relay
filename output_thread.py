@@ -170,7 +170,7 @@ class ZoneValveThread(Thread):
         while True:
             topic = f'{self.sensor_path}/target_heatingcooling_state'
             message = self.r.get(topic)
-            if message == None:
+            if message is None:
                 time.sleep(self.interval)
                 continue
 
@@ -179,7 +179,7 @@ class ZoneValveThread(Thread):
 
             topic = f'{self.sensor_path}/control_value'
             message = self.r.get(topic)
-            if message == None:
+            if message is None:
                 time.sleep(self.interval)
                 continue
 
