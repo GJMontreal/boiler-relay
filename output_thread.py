@@ -42,6 +42,7 @@ class BoilerThread(Thread):
         GPIO.output(gpio, output)
         GPIO.cleanup()
 
+# we should be able to read either a gpio or directly from say redis
     def run(self):
         while True:
             #read each of the inputs
@@ -315,7 +316,6 @@ class PIDThread(Thread):
                 self.setpoint = float(data['value'])
             self.pid.setpoint = self.setpoint
 
-            # print(f'{self.sensor_path} {self.control_value} {self.current_temperature} {self.setpoint}')
             self.zone.current_temperature = self.current_temperature
             self.zone.target_temperature = self.setpoint
             self.zone.control_value = control_value
@@ -324,6 +324,7 @@ class PIDThread(Thread):
             self.r.set(topic, control_value)
             self.r.publish(topic, control_value)
             
+            print(f'{self.sensor_path} {self.control_value} {self.current_temperature} {self.setpoint}')
             # if self.zone.last_sample_time != None:
             #     self.write_row()
 
