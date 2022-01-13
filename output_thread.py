@@ -197,7 +197,7 @@ class ZoneValveThread(Thread):
             topic = f'{self.sensor_path}/boost'
             message = self.r.get(topic)
             if message is not None:
-                bool_value = bool(message.decode('utf-8'))
+                bool_value = json.loads(message)
                 if bool_value == True:
                     heating_cooling_state = HeatingCoolingState.HEAT
 
