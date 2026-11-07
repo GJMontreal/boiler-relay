@@ -1,56 +1,31 @@
-from src.config import MQTTConfig, RedisConfig, RelayConfig
+from src.config import MQTTConfig, RelayConfig
 from src.gpio import GPIO
-from json import dumps, load
-from redis import Redis
-from threading import Thread
-from time import sleep
+from json import dumps
+from threading import Event, Lock, Thread
 from paho.mqtt import client as mqtt_client
 
 class Actuator():
   output_type = None
 
-  def  __init__(self, path, redis_config: RedisConfig, mqtt_config: MQTTConfig = None, output_config: dict = None, update_interval = 0.5) -> None:
-    self.path = path
-    self.redis = Redis(host=redis_config.host, port=redis_config.port,db=0)
-    self.mqtt_config = mqtt_config
+  def __init__(self, output_config: dict, mqtt_config: MQTTConfig = None) -> None:
     self.output_config = output_config
-    self.should_run = False
-    self.update_interval = update_interval
+    self.mqtt_config = mqtt_config
 
   def start(self):
-    self.should_run = True
-    print(f"starting {self.path}")
-    self.thread = Thread(target = self.run)
-    self.thread.start()
-  
+    pass
+
   def stop(self):
-    print(f"stopping {self.path}")
-    self.should_run = False
-
-  def run(self):
-    while self.should_run == True:
-      sleep(self.update_interval)
-
-      topic = f'{self.path}/heating_cooling_state'
-      message = self.redis.get(topic)
-      if message is None:
-        continue
-
-      try:
-        value = float(message.decode('utf-8'))
-        self.activate(value = value)
-      except:
-        print("error")
+    pass
 
   # it's up to concrete implementations to do something useful here
   def activate(self, value):
-    print(f"{self.path}.value = {value}")
+    print(f"{self.output_config}.value = {value}")
 
 class GPIOOutput(Actuator):
   output_type = "gpio"
 
-  def __init__(self, path, redis_config: RedisConfig, mqtt_config: MQTTConfig, output_config: dict, update_interval=0.5) -> None:
-    super().__init__(path, redis_config, mqtt_config, output_config, update_interval)
+  def __init__(self, output_config: dict, mqtt_config: MQTTConfig = None) -> None:
+    super().__init__(output_config, mqtt_config)
     self.pin = output_config["pin"]
     self.active_low = output_config.get("active_low", False)
     self.config_gpio()
@@ -74,17 +49,57 @@ class GPIOOutput(Actuator):
 class MQTTRelay(Actuator):
   output_type = "MQTTRelay"
 
-  def __init__(self, path, redis_config: RedisConfig, mqtt_config: MQTTConfig, output_config: dict, update_interval=0.5) -> None:
-    super().__init__(path, redis_config, mqtt_config, output_config, update_interval)
+  def __init__(self, output_config: dict, mqtt_config: MQTTConfig = None) -> None:
+    super().__init__(output_config, mqtt_config)
     self.relay_config = RelayConfig(topic=output_config["topic"], device=output_config["device"])
+    self.client = None
+    self.latest = None
+    self.pending = Event()
+    self.lock = Lock()
+    self.should_run = False
+
+  def start(self):
+    self.should_run = True
+    self.thread = Thread(target = self.run, daemon = True)
+    self.thread.start()
+
+  def stop(self):
+    self.should_run = False
+    self.pending.set()
 
   def activate(self, value):
-    # we can use json to make this easier to encode
-    message = {"Device":self.relay_config.device,
-               "Send":{"Power":value}}
-    print(message)
+    with self.lock:
+      self.latest = value
+    self.pending.set()
 
-def create_output(output_config, path, redis_config, mqtt_config):
+  def run(self):
+    while self.should_run:
+      self.pending.wait()
+      with self.lock:
+        value = self.latest
+        self.pending.clear()
+      if self.should_run:
+        self.send(value)
+
+  def connect(self):
+    if self.mqtt_config is None:
+      raise ValueError("missing MQTT configuration")
+    client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2)
+    client.connect(self.mqtt_config.host, self.mqtt_config.port, int(self.mqtt_config.keep_alive))
+    client.loop_start()
+    return client
+
+  def send(self, value):
+    message = {"Device":self.relay_config.device,
+               "Send":{"Power":1 if value else 0}}
+    try:
+      if self.client is None:
+        self.client = self.connect()
+      self.client.publish(self.relay_config.topic, dumps(message))
+    except Exception as error:
+      print(f"MQTT send failed for {self.relay_config.device}: {error}")
+
+def create_output(output_config, mqtt_config):
   if "type" not in output_config:
     print("missing output type")
     return
@@ -95,4 +110,4 @@ def create_output(output_config, path, redis_config, mqtt_config):
     print(f"Unsupported output type: {type_name}")
     return
 
-  return output_types[type_name](path, redis_config, mqtt_config, output_config)
+  return output_types[type_name](output_config, mqtt_config)

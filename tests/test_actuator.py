@@ -1,168 +1,196 @@
-from src.actuator import Actuator, GPIOOutput, MQTTRelay, create_output
-from src.config import MQTTConfig, RedisConfig
+from json import dumps
+from threading import Event
+from time import sleep
+from types import SimpleNamespace
 
-REDIS = RedisConfig(host="localhost", port=6379)
+import pytest
+
+from src import actuator
+from src.actuator import GPIOOutput, MQTTRelay, create_output
+from src.config import MQTTConfig
+
 MQTT = MQTTConfig(host="broker.local", port=1883, keep_alive=60)
 RELAY = {"type": "MQTTRelay", "topic": "cmnd/x/ZbSend", "device": "0xB5EA"}
 
 
-class Recording(Actuator):
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-    self.values = []
-
-  def activate(self, value):
-    self.values.append(value)
-    self.should_run = False
+def wait_for(condition, timeout=2):
+  for _ in range(int(timeout / 0.01)):
+    if condition():
+      return True
+    sleep(0.01)
+  return False
 
 
-def test_run_passes_redis_value_to_activate(redis_client):
-  redis_client.set("/home/sensors/a/heating_cooling_state", "0.75")
-  actuator = Recording("/home/sensors/a", REDIS, update_interval=0)
-  actuator.should_run = True
+@pytest.fixture
+def mqtt_clients(monkeypatch):
+  class FakeClient:
+    instances = []
+    gate = None
+    entered = Event()
+    fail_connect = False
 
-  actuator.run()
+    def __init__(self, version):
+      self.version = version
+      self.published = []
+      FakeClient.instances.append(self)
 
-  assert actuator.values == [0.75]
+    def connect(self, host, port, keep_alive):
+      if FakeClient.fail_connect:
+        raise OSError("unreachable")
+      self.address = (host, port, keep_alive)
 
+    def loop_start(self):
+      self.looping = True
 
-def test_run_skips_when_no_value(redis_client):
-  actuator = Recording("/home/sensors/a", REDIS, update_interval=0)
-  actuator.should_run = True
-  calls = []
+    def publish(self, topic, payload):
+      FakeClient.entered.set()
+      if FakeClient.gate is not None:
+        FakeClient.gate.wait(2)
+      self.published.append((topic, payload))
 
-  original = actuator.redis.get
-
-  def get(topic):
-    calls.append(topic)
-    if len(calls) == 3:
-      actuator.should_run = False
-    return original(topic)
-
-  actuator.redis.get = get
-  actuator.run()
-
-  assert actuator.values == []
-  assert len(calls) == 3
-
-
-def test_run_survives_unparseable_value(redis_client):
-  redis_client.set("/home/sensors/a/heating_cooling_state", "not a number")
-  actuator = Recording("/home/sensors/a", REDIS, update_interval=0)
-  actuator.should_run = True
-  calls = []
-  original = actuator.redis.get
-
-  def get(topic):
-    calls.append(topic)
-    if len(calls) == 2:
-      actuator.should_run = False
-    return original(topic)
-
-  actuator.redis.get = get
-  actuator.run()
-
-  assert actuator.values == []
+  monkeypatch.setattr(actuator, "mqtt_client", SimpleNamespace(
+    Client=FakeClient,
+    CallbackAPIVersion=SimpleNamespace(VERSION2="v2"),
+  ))
+  return FakeClient
 
 
-def test_stop_clears_should_run(redis_client):
-  actuator = Actuator("/home/sensors/a", REDIS)
-  actuator.should_run = True
-
-  actuator.stop()
-
-  assert actuator.should_run is False
+def payload(power):
+  return dumps({"Device": "0xB5EA", "Send": {"Power": power}})
 
 
-def test_create_output_builds_the_named_actuator(redis_client):
-  actuator = create_output(RELAY, "/home/sensors/a", REDIS, MQTT)
+def test_create_output_builds_the_named_actuator():
+  relay = create_output(RELAY, MQTT)
 
-  assert isinstance(actuator, MQTTRelay)
-  assert actuator.path == "/home/sensors/a"
-  assert actuator.mqtt_config is MQTT
-  assert actuator.relay_config.device == "0xB5EA"
-  assert actuator.relay_config.topic == "cmnd/x/ZbSend"
-
-
-def test_create_output_without_type_returns_none(redis_client):
-  assert create_output({"topic": "cmnd/x"}, "/home/sensors/a", REDIS, MQTT) is None
+  assert isinstance(relay, MQTTRelay)
+  assert relay.mqtt_config is MQTT
+  assert relay.relay_config.device == "0xB5EA"
+  assert relay.relay_config.topic == "cmnd/x/ZbSend"
 
 
-def test_create_output_with_unknown_type_returns_none(redis_client):
-  assert create_output({"type": "Toaster"}, "/home/sensors/a", REDIS, MQTT) is None
+def test_create_output_without_type_returns_none():
+  assert create_output({"topic": "cmnd/x"}, MQTT) is None
 
 
-def test_create_output_ignores_names_that_are_not_actuators(redis_client):
-  assert create_output({"type": "Redis"}, "/home/sensors/a", REDIS, MQTT) is None
+def test_create_output_with_unknown_type_returns_none():
+  assert create_output({"type": "Toaster"}, MQTT) is None
 
 
-def test_relay_prints_the_device_message(redis_client, capsys):
-  relay = create_output(RELAY, "/home/sensors/a", REDIS, MQTT)
-
-  relay.activate(1.0)
-
-  assert "'Device': '0xB5EA'" in capsys.readouterr().out
+def test_create_output_ignores_names_that_are_not_actuators():
+  assert create_output({"type": "Redis"}, MQTT) is None
 
 
-def make_gpio_output(gpio, active_low=False, pin="P8_10"):
-  output = {"type": "gpio", "pin": pin, "active_low": active_low}
-  actuator = create_output(output, "/home/sensors/a", REDIS, MQTT)
-  gpio.clear()
-  return actuator
-
-
-def test_create_output_builds_a_gpio_output(redis_client, gpio):
-  output = make_gpio_output(gpio)
+def test_create_output_builds_a_gpio_output(gpio):
+  output = create_output({"type": "gpio", "pin": "P8_10"}, MQTT)
 
   assert isinstance(output, GPIOOutput)
   assert output.pin == "P8_10"
 
 
-def test_gpio_output_defaults_to_active_high(redis_client, gpio):
-  output = create_output({"type": "gpio", "pin": "P8_10"}, "/home/sensors/a", REDIS, MQTT)
-
-  assert output.active_low is False
+def test_gpio_output_defaults_to_active_high(gpio):
+  assert create_output({"type": "gpio", "pin": "P8_10"}, MQTT).active_low is False
 
 
-def test_gpio_output_starts_inactive(redis_client, gpio):
-  create_output({"type": "gpio", "pin": "P8_10", "active_low": True}, "/home/sensors/a", REDIS, MQTT)
+def test_gpio_output_starts_inactive(gpio):
+  create_output({"type": "gpio", "pin": "P8_10", "active_low": True}, MQTT)
   assert gpio == [("P8_10", 1)]
 
   gpio.clear()
-  create_output({"type": "gpio", "pin": "P8_10", "active_low": False}, "/home/sensors/a", REDIS, MQTT)
+  create_output({"type": "gpio", "pin": "P8_10", "active_low": False}, MQTT)
   assert gpio == [("P8_10", 0)]
 
 
-def test_gpio_output_follows_value(redis_client, gpio):
-  output = make_gpio_output(gpio)
+def test_gpio_output_follows_value(gpio):
+  output = create_output({"type": "gpio", "pin": "P8_10"}, MQTT)
+  gpio.clear()
 
-  output.activate(1.0)
-  output.activate(0.0)
+  output.activate(1)
+  output.activate(0)
 
   assert gpio == [("P8_10", 1), ("P8_10", 0)]
 
 
-def test_gpio_output_active_low_inverts(redis_client, gpio):
-  output = make_gpio_output(gpio, active_low=True)
+def test_gpio_output_active_low_inverts(gpio):
+  output = create_output({"type": "gpio", "pin": "P8_10", "active_low": True}, MQTT)
+  gpio.clear()
 
-  output.activate(1.0)
-  output.activate(0.0)
+  output.activate(1)
+  output.activate(0)
 
   assert gpio == [("P8_10", 0), ("P8_10", 1)]
 
 
-def test_gpio_output_drives_the_pin_from_redis(redis_client, gpio):
-  redis_client.set("/home/sensors/a/heating_cooling_state", "1")
-  output = make_gpio_output(gpio)
-  output.update_interval = 0
-  output.should_run = True
-  original = output.activate
+def test_relay_send_publishes_the_device_message(mqtt_clients):
+  relay = create_output(RELAY, MQTT)
 
-  def activate(value):
-    original(value)
-    output.should_run = False
+  relay.send(1)
 
-  output.activate = activate
-  output.run()
+  assert mqtt_clients.instances[0].published == [("cmnd/x/ZbSend", payload(1))]
 
-  assert gpio == [("P8_10", 1)]
+
+def test_relay_connects_with_the_mqtt_config(mqtt_clients):
+  relay = create_output(RELAY, MQTT)
+
+  relay.send(1)
+
+  client = mqtt_clients.instances[0]
+  assert client.address == ("broker.local", 1883, 60)
+  assert client.looping is True
+
+
+def test_relay_reuses_its_connection(mqtt_clients):
+  relay = create_output(RELAY, MQTT)
+
+  relay.send(1)
+  relay.send(0)
+
+  assert len(mqtt_clients.instances) == 1
+  assert [p for _, p in mqtt_clients.instances[0].published] == [payload(1), payload(0)]
+
+
+def test_relay_survives_an_unreachable_broker(mqtt_clients, capsys):
+  mqtt_clients.fail_connect = True
+  relay = create_output(RELAY, MQTT)
+
+  relay.send(1)
+
+  assert "MQTT send failed" in capsys.readouterr().out
+
+
+def test_relay_without_mqtt_config_reports_and_does_not_raise(capsys):
+  relay = create_output(RELAY, None)
+
+  relay.send(1)
+
+  assert "missing MQTT configuration" in capsys.readouterr().out
+
+
+def test_relay_thread_sends_what_activate_receives(mqtt_clients):
+  relay = create_output(RELAY, MQTT)
+  relay.start()
+
+  relay.activate(1)
+
+  assert wait_for(lambda: mqtt_clients.instances and mqtt_clients.instances[0].published)
+  assert mqtt_clients.instances[0].published == [("cmnd/x/ZbSend", payload(1))]
+  relay.stop()
+  relay.thread.join(2)
+  assert not relay.thread.is_alive()
+
+
+def test_slow_send_does_not_block_activate_and_keeps_the_latest(mqtt_clients):
+  mqtt_clients.gate = Event()
+  relay = create_output(RELAY, MQTT)
+  relay.start()
+
+  relay.activate(1)
+  assert mqtt_clients.entered.wait(2)
+  relay.activate(0)
+  relay.activate(1)
+  relay.activate(0)
+  mqtt_clients.gate.set()
+
+  client = mqtt_clients.instances[0]
+  assert wait_for(lambda: len(client.published) == 2)
+  assert [p for _, p in client.published] == [payload(1), payload(0)]
+  relay.stop()

@@ -1,5 +1,3 @@
 -r requirements.txt
 pytest
 fakeredis
-simple-pid
-paho-mqtt

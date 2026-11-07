@@ -2,18 +2,15 @@
 
 ## Get `main.py` running
 
-- [ ] Add `paho-mqtt` and the package providing `unopt` to `requirements.txt`, or drop `unopt`.
+- [ ] Add the package providing `unopt` to `requirements.txt`, or drop `unopt`.
 - [ ] Make `system_config.json` the `main.py` default and delete `config.json`.
 
 ## Outputs
 
-- [ ] Finish `MQTTRelay`: publish the message to the topic over MQTT.
-- [ ] Rename `ZoneValveThread` and `zone_valve_thread.py`. They no longer drive valves.
+- [ ] Publish a real MQTT message from `MQTTRelay` against a broker and check the Zigbee relay switches.
 
 ## Cleanup
 
-- [ ] Remove the duplicate `PIDThread.write_row` or `Zone.write_row`.
-- [ ] Remove `HeatingCoolingState` from `src/output_thread.py`, use `src/heating_cooling_state.py`.
 - [ ] Move the log path out of code and into config.
 - [ ] Move PID gains into per-zone config.
 
@@ -29,5 +26,6 @@
 
 - [ ] Add tests for `main.py` config loading.
 - [ ] Replace `print` with `logging`.
+- [ ] Keep the zone loop alive when redis raises, and drive outputs inactive if it stops.
 - [ ] Add a clean shutdown path for the threads and GPIO cleanup.
-- [ ] Update `.vscode/launch.json`, which still launches the `output_thread` module.
+- [ ] Update `.vscode/launch.json`, which still launches the deleted `output_thread` module.

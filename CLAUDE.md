@@ -1,6 +1,6 @@
 # boiler-relay
 
-Python control software for a zone-valve hydronic heating system on a BeagleBone. Each zone runs a PID loop on a temperature from redis and drives zone valve relays. A boiler output follows the OR of the zone call-for-heat inputs.
+Python control software for a zone-valve hydronic heating system on a BeagleBone. Each zone is one thread that runs a PID loop on a temperature from redis and drives its outputs. A boiler output follows the OR of the zone call-for-heat inputs.
 
 ## Branch state
 
@@ -8,20 +8,18 @@ Python control software for a zone-valve hydronic heating system on a BeagleBone
 
 Known breakage in the new code:
 
-- `main.py` imports `unopt`, which is not in `requirements.txt`. `paho-mqtt` is also missing.
+- `main.py` imports `unopt`, which is not in `requirements.txt`.
 - `ZoneConfig` follows the `system_config.json` zone shape (`sensor_path`, `outputs`). `config.json`, the `main.py` default, still uses the old `input_gpio` and `output_gpio` keys and fails to load.
-- `src/actuator.py` `MQTTRelay` builds the message and prints it. It does not publish to MQTT yet.
+- `MQTTRelay` publishing has only run against a fake paho client, never a broker.
 - `src/gpio.py` is a stub that prints. Real GPIO needs `Adafruit_BBIO.GPIO`, which only installs on the BeagleBone.
 - `deploy.sh` copies `src/*.py` but not `main.py`. The unit files still run the deleted `boiler_relay.py`.
 
 ## Layout
 
 - `main.py`: new entry point. Reads `--config` (default `config.json`), builds `Zone` objects and a `BoilerThread`, and starts them.
-- `src/zone.py`: one zone. Owns a `PIDThread`.
-- `src/output_thread.py`: `PIDThread` (reads temperature and setpoint from redis, writes `output_path`), `ZoneLoggingThread`.
+- `src/zone.py`: `Zone` is a thread. Every `interval` seconds it reads temperature, setpoint, target state and boost from redis, runs the PID, turns the control value into a duty cycle over a ten minute window, writes `control_value` and `heating_cooling_state` to redis, calls `activate` on each output, and appends a CSV row when `LOG_PATH` exists. The PID samples every `pid_interval`.
 - `src/boiler_thread.py`: `BoilerThread`, turns the boiler output on when any pin in the top-level `inputs` list is high.
-- `src/zone_valve_thread.py`: turns `control_value` into a time-proportioned on/off cycle and publishes it as `heating_cooling_state`. It does not touch GPIO. The zone's actuators do.
-- `src/actuator.py`: `Actuator` base class that polls redis `<path>/heating_cooling_state`, plus `GPIOOutput` (`type: gpio`, one `pin`), `MQTTRelay` and `create_output`. `Zone` builds one actuator per output through `create_output`. A new actuator type is a subclass with an `output_type` string, constructed as `(path, redis_config, mqtt_config, output_config)`.
+- `src/actuator.py`: `Actuator` base class with `start`, `stop` and `activate(value)`, plus `GPIOOutput` (`type: gpio`, one `pin`), `MQTTRelay` and `create_output`. `Zone` builds one actuator per output and calls `activate` from its own thread. `MQTTRelay` keeps only the latest value and sends it from a worker thread, so a slow broker never stalls the zone. A new actuator type is a subclass with an `output_type` string, constructed as `(output_config, mqtt_config)`.
 - `src/config.py`: dataclass configs with `from_file`.
 - `src/gpio.py`: GPIO wrapper for development off the BeagleBone.
 - `config.json`: legacy zone and boiler config. `system_config.json`: the new config shape, with `mqtt`, `redis`, `zones`, `boiler` and `inputs`.
@@ -34,14 +32,14 @@ The Homebridge plugin and the MQTT bridge share these keys. Do not rename them. 
 - `<sensor_path>/current_temperature`: JSON `{"value", "time"}`. Written by the MQTT bridge.
 - `<sensor_path>/target_temperature`: JSON `{"value"}`. Written by Homebridge.
 - `<sensor_path>/target_heatingcooling_state`: int, `HeatingCoolingState` (0 off, 1 heat, 2 cool).
-- `<sensor_path>/control_value`: float 0 to 1, PID output.
+- `<sensor_path>/control_value`: float 0 to 1, PID output. Written by the zone.
 - `<sensor_path>/boost`: JSON boolean, forces the valve open.
-- `<sensor_path>/heating_cooling_state`: set and published by the zone valve thread.
+- `<sensor_path>/heating_cooling_state`: set and published by the zone.
 
 ## Conventions
 
 - Two-space indent in `main.py` and the newer `src/` files, four in older ones. Match the file you edit.
-- One thread per concern, each with a `while True` loop and a `sleep(interval)`.
+- One thread per zone, one per MQTT relay and one for the boiler. Loops are `while True` with a `sleep(interval)`. Outputs are called, not polled.
 - A zone's `active_low` is the default for its gpio outputs. An output's own `active_low` overrides it. `GPIOOutput.activate` inverts at the last step before `GPIO.output`.
 - GPIO pin names are BeagleBone headers such as `P8_10`.
 - Tests live in `tests/` and use pytest with fakeredis and a recording GPIO. Run `.venv/bin/python -m pytest`. Loop threads are stopped by a fake `sleep` that raises, see `run_ticks` in `tests/conftest.py`.

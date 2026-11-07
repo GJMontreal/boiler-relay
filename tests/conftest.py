@@ -1,7 +1,8 @@
 import fakeredis
 import pytest
 
-from src import actuator, boiler_thread, output_thread, zone_valve_thread
+from src import actuator, boiler_thread
+from src import zone as zone_module
 
 
 class StopLoop(Exception):
@@ -24,9 +25,7 @@ def redis_client(redis_server, redis_connections, monkeypatch):
     redis_connections.append(kwargs)
     return fakeredis.FakeRedis(server=redis_server)
 
-  monkeypatch.setattr(actuator, "Redis", make_client)
-  monkeypatch.setattr(zone_valve_thread, "Redis", make_client)
-  monkeypatch.setattr(output_thread.redis, "Redis", make_client)
+  monkeypatch.setattr(zone_module, "Redis", make_client)
   return fakeredis.FakeRedis(server=redis_server)
 
 
@@ -43,9 +42,8 @@ def run_ticks(monkeypatch):
       if count >= ticks:
         raise StopLoop
 
-    monkeypatch.setattr(zone_valve_thread, "sleep", fake_sleep)
+    monkeypatch.setattr(zone_module, "sleep", fake_sleep)
     monkeypatch.setattr(boiler_thread, "sleep", fake_sleep)
-    monkeypatch.setattr(output_thread.time, "sleep", fake_sleep)
     with pytest.raises(StopLoop):
       thread.run()
 
@@ -84,6 +82,5 @@ def gpio(monkeypatch, gpio_inputs):
       return gpio_inputs.get(pin, 0)
 
   monkeypatch.setattr(actuator, "GPIO", RecordingGPIO)
-  monkeypatch.setattr(output_thread, "GPIO", RecordingGPIO)
   monkeypatch.setattr(boiler_thread, "GPIO", RecordingGPIO)
   return calls

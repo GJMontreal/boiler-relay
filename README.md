@@ -22,11 +22,11 @@ The bits circled in red are the ones I've written. The UI is implemented as a [H
 ![software](img/ui.jpeg)
 
 ## How a zone works
-Each zone has a temperature sensor, a setpoint and one or more zone valve outputs.
+Each zone has a temperature sensor, a setpoint and one or more outputs. One thread per zone does the work.
 
 1. A PID loop compares the current temperature to the setpoint and produces a control value between 0 and 1.
-2. The zone valve thread turns that value into a duty cycle over a ten minute window. A control value of 0.3 opens the valve for three minutes of each ten. It publishes the result as the zone's `heating_cooling_state`.
-3. Each of the zone's outputs follows that state. An output is a local GPIO pin or an MQTT relay.
+2. The zone turns that value into a duty cycle over a ten minute window. A control value of 0.3 opens the valve for three minutes of each ten. It publishes the result as the zone's `heating_cooling_state`.
+3. The zone then calls each of its outputs with that state. An output is a local GPIO pin or an MQTT relay. MQTT messages go out on a separate thread, so a slow broker never delays the zone.
 4. The boiler thread reads one call-for-heat input per zone. It turns the boiler and pump on when any zone is calling.
 
 A boost flag in redis forces a zone open regardless of the PID output. Gpio outputs can be configured active low per zone or per output.
@@ -39,9 +39,9 @@ Every zone is identified by a sensor path such as `/home/sensors/0xFD69`.
 | `<sensor_path>/current_temperature` | MQTT bridge | JSON with `value` and `time` |
 | `<sensor_path>/target_temperature` | Homebridge | JSON with `value` |
 | `<sensor_path>/target_heatingcooling_state` | Homebridge | 0 off, 1 heat, 2 cool |
-| `<sensor_path>/control_value` | PID thread | 0 to 1 |
+| `<sensor_path>/control_value` | zone | 0 to 1 |
 | `<sensor_path>/boost` | Homebridge | JSON boolean |
-| `<sensor_path>/heating_cooling_state` | zone valve thread | 0 or 1 |
+| `<sensor_path>/heating_cooling_state` | zone | 0 or 1 |
 
 ## Configuration
 Zones, the boiler output and the redis and MQTT endpoints are described in JSON. `system_config.json` is the format the modular version reads: each zone lists a set of typed outputs, which can be a local GPIO or an MQTT relay.
