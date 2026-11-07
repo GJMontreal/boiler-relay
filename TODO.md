@@ -25,7 +25,7 @@ The project controls two systems, set per zone by the `system` field. Hydronic i
 - [ ] Revisit sending relay commands through redis and the bridge, which would drop paho from the control process. Not now, because the radiator would then depend on the bridge to switch.
 - [ ] Homebridge needs a stairwell thermostat that writes `/home/sensors/stairwell/target_temperature` and `target_heatingcooling_state`. Until it does, the Stairwell zone idles.
 - [ ] Confirm the Bedrooms end-switch pairing: `P8_10` with `P8_9` and `P8_14` with `P8_17`.
-- [ ] The device's login banner prints the default `debian` password. Change it and consider key-only ssh.
+- [ ] Change the device's default `debian` password and consider key-only ssh. On 2026-11-07 the line printing it was removed from `/etc/issue` and `/etc/issue.net`, with backups in `/etc/issue.bak` and `/etc/issue.net.bak`. The password itself has not been changed.
 - [ ] The `back_room` sensor stopped reporting on 2026-10-24. Check its battery.
 - [ ] Add a GPIO pull-up or pull-down choice for the end-switch inputs if the wiring needs one.
 - [ ] Move PID gains per zone only if the stairwell radiator needs different ones. The config already supports it.
