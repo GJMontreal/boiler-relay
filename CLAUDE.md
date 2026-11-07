@@ -11,7 +11,6 @@ Known breakage in the new code:
 - `main.py` imports `unopt`, which is not in `requirements.txt`.
 - `ZoneConfig` follows the `system_config.json` zone shape (`sensor_path`, `outputs`). `config.json`, the `main.py` default, still uses the old `input_gpio` and `output_gpio` keys and fails to load.
 - `MQTTRelay` publishing has only run against a fake paho client, never a broker.
-- `src/gpio.py` is a stub that prints. Real GPIO needs `Adafruit_BBIO.GPIO`, which only installs on the BeagleBone.
 - `deploy.sh` copies `src/*.py` but not `main.py`. The unit files still run the deleted `boiler_relay.py`.
 
 ## Layout
@@ -21,7 +20,7 @@ Known breakage in the new code:
 - `src/boiler_thread.py`: `BoilerThread`, turns the boiler output on when any pin in the top-level `inputs` list is high.
 - `src/actuator.py`: `Actuator` base class with `start`, `stop` and `activate(value)`, plus `GPIOOutput` (`type: gpio`, one `pin`), `MQTTRelay` and `create_output`. `Zone` builds one actuator per output and calls `activate` from its own thread. `MQTTRelay` keeps only the latest value and sends it from a worker thread, so a slow broker never stalls the zone. A new actuator type is a subclass with an `output_type` string, constructed as `(output_config, mqtt_config)`.
 - `src/config.py`: dataclass configs with `from_file`.
-- `src/gpio.py`: GPIO wrapper for development off the BeagleBone.
+- `src/gpio.py`: exports `GPIO`. It is `Adafruit_BBIO.GPIO` when that imports, and a stub that prints otherwise. `actuator.py` and `boiler_thread.py` import it from here.
 - `config.json`: legacy zone and boiler config. `system_config.json`: the new config shape, with `mqtt`, `redis`, `zones`, `boiler` and `inputs`.
 - `deploy.sh`, `deploy/`, `unit/`: rsync-style deploy to the device and systemd unit. `*.template` files hold `<user_name>` and `<project_name>` placeholders.
 
@@ -52,4 +51,4 @@ python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 ```
 
-`Adafruit-BBIO` fails to install off the BeagleBone. `requirements-dev.txt` leaves it out for that reason.
+`Adafruit-BBIO` fails to install off the BeagleBone. `requirements-dev.txt` leaves it out and lists the other dependencies itself.

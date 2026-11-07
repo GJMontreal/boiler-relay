@@ -55,7 +55,7 @@ python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
 python main.py --config system_config.json
 ```
-A local redis is required. Off the BeagleBone, `src/gpio.py` stands in for the real GPIO library and prints instead of switching pins.
+A local redis is required. `src/gpio.py` uses `Adafruit_BBIO` when it is installed. Without it, a stub prints instead of switching pins and logs a warning at startup.
 
 ## Deploying
 `./deploy.sh <user> <host>` fills in the unit and setup templates, copies the files over ssh and builds a virtualenv on the device. It deletes the existing install directory first.

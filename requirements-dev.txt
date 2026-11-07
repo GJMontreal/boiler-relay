@@ -1,3 +1,5 @@
--r requirements.txt
 pytest
 fakeredis
+redis
+simple-pid
+paho-mqtt>=2.0
