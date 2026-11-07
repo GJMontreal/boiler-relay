@@ -15,7 +15,6 @@ The project controls two systems, set per zone by the `system` field. Hydronic i
 - [x] Add `deploy/switch.sh legacy|v2|shadow`. It stops the old service, waits, starts the new one and moves the boot-time enable. It runs over `ssh -t` with sudo.
 - [x] Rewrite `deploy.sh` to use `rsync --delete` with `.venv` excluded, to derive paths from the service name, and to refuse the legacy directory.
 - [x] Move `After=redis.service` from `[Service]` to `[Unit]` in the unit template.
-- [ ] Compare legacy and shadow per zone and per ten-minute window: mean control value and on-fraction.
 - [ ] First deploy at the house during heating season. Watch each zone open and close once and check the boiler follows the end switches. Roll back with `switch.sh legacy`.
 - [ ] Install `paho-mqtt` 2.x, `simple-pid` and `redis==3.5.3` on the device's Python 3.7 in the new venv.
 
