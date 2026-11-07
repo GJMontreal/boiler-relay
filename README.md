@@ -83,6 +83,8 @@ At startup the service sets `heating/versions/boiler-relay` to JSON with `versio
 ## Deploying
 `./deploy.sh <user> <host>` fills in the unit and setup templates from `deploy/`, syncs the package, config and `build_info.json` with `rsync --delete` and builds a virtualenv on the device. The service is `boiler_relay_v2`. It installs to `/var/lib/boiler_relay_v2` and runs as `SERVICE_USER` (default `heating`, created by the caller and a member of `gpio`). `.venv` survives the sync. The script refuses `/var/lib/boiler_relay` and `/home/debian/boiler-relay`, which belong to the legacy service.
 
+The virtualenv build and every pip install run under `nice -n 19 ionice -c3`, so they cannot starve the live service on the single core.
+
 The script prints the command that copies the units to `/etc/systemd/system` and installs the legacy drop-in. The drop-in, `deploy/boiler_relay.service.d/conflicts.conf`, makes `boiler_relay.service` conflict with v2.
 
 `deploy/switch.sh <user> <host> legacy|v2|shadow [--confirm]` runs over `ssh -t` with sudo. It stops the old services, waits until they are inactive, starts the new ones and moves the boot-time enable. It changes nothing if the target unit is missing or does not stay up.
