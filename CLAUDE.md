@@ -20,8 +20,8 @@ Known breakage in the new code:
 - `src/zone.py`: one zone. Owns a `PIDThread`.
 - `src/output_thread.py`: `PIDThread` (reads temperature and setpoint from redis, writes `output_path`), `ZoneLoggingThread`.
 - `src/boiler_thread.py`: `BoilerThread`, turns the boiler output on when any pin in the top-level `inputs` list is high.
-- `src/zone_valve_thread.py`: turns `control_value` into a time-proportioned on/off cycle on the zone GPIOs.
-- `src/actuator.py`: `Actuator` base class that polls redis `<path>/heating_cooling_state`, plus `MQTTRelay` and `create_output`. `Zone` builds one actuator per non-gpio output through `create_output`. A new actuator type is a subclass constructed as `(path, redis_config, mqtt_config, output_config)`.
+- `src/zone_valve_thread.py`: turns `control_value` into a time-proportioned on/off cycle and publishes it as `heating_cooling_state`. It does not touch GPIO. The zone's actuators do.
+- `src/actuator.py`: `Actuator` base class that polls redis `<path>/heating_cooling_state`, plus `GPIOOutput` (`type: gpio`, one `pin`), `MQTTRelay` and `create_output`. `Zone` builds one actuator per output through `create_output`. A new actuator type is a subclass with an `output_type` string, constructed as `(path, redis_config, mqtt_config, output_config)`.
 - `src/config.py`: dataclass configs with `from_file`.
 - `src/gpio.py`: GPIO wrapper for development off the BeagleBone.
 - `config.json`: legacy zone and boiler config. `system_config.json`: the new config shape, with `mqtt`, `redis`, `zones`, `boiler` and `inputs`.
@@ -42,7 +42,7 @@ The Homebridge plugin and the MQTT bridge share these keys. Do not rename them. 
 
 - Two-space indent in `main.py` and the newer `src/` files, four in older ones. Match the file you edit.
 - One thread per concern, each with a `while True` loop and a `sleep(interval)`.
-- Outputs can be active low per zone. Invert at the last step before `GPIO.output`.
+- A zone's `active_low` is the default for its gpio outputs. An output's own `active_low` overrides it. `GPIOOutput.activate` inverts at the last step before `GPIO.output`.
 - GPIO pin names are BeagleBone headers such as `P8_10`.
 - Tests live in `tests/` and use pytest with fakeredis and a recording GPIO. Run `.venv/bin/python -m pytest`. Loop threads are stopped by a fake `sleep` that raises, see `run_ticks` in `tests/conftest.py`.
 - No linter. Run `python main.py -c system_config.json` to smoke test with the stub GPIO. It needs a local redis.

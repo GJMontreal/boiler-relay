@@ -8,8 +8,7 @@
 ## Outputs
 
 - [ ] Finish `MQTTRelay`: publish the message to the topic over MQTT.
-- [ ] Add a GPIO actuator so `type: gpio` outputs work.
-- [ ] Move active-low handling to the output, per zone.
+- [ ] Rename `ZoneValveThread` and `zone_valve_thread.py`. They no longer drive valves.
 
 ## Cleanup
 

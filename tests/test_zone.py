@@ -1,6 +1,6 @@
 import pytest
 
-from src.actuator import MQTTRelay
+from src.actuator import GPIOOutput, MQTTRelay
 from src.config import MQTTConfig, RedisConfig, ZoneConfig
 from src.zone import Zone
 
@@ -30,21 +30,30 @@ def test_zone_reads_sensor_and_writes_control_value(redis_client, gpio):
   assert zone.pid_thread.pid_interval == 10.0
 
 
-def test_valve_thread_drives_only_gpio_outputs(redis_client, gpio):
+def test_zone_builds_an_actuator_for_each_output(redis_client, gpio):
   zone = make_zone([
     {"type": "gpio", "pin": "P8_10"},
     RELAY,
     {"type": "gpio", "pin": "P8_14"},
   ])
 
-  assert zone.zone_valve_thread.output_gpio == ["P8_10", "P8_14"]
+  assert [type(actuator) for actuator in zone.actuators] == [GPIOOutput, MQTTRelay, GPIOOutput]
+  assert [actuator.pin for actuator in zone.actuators if isinstance(actuator, GPIOOutput)] == ["P8_10", "P8_14"]
+  assert all(actuator.path == "/home/sensors/a" for actuator in zone.actuators)
+  assert zone.actuators[1].mqtt_config is MQTT
 
 
 @pytest.mark.parametrize("active_low", [True, False])
-def test_valve_thread_inherits_active_low(redis_client, gpio, active_low):
-  zone = make_zone(active_low=active_low)
+def test_gpio_outputs_inherit_zone_active_low(redis_client, gpio, active_low):
+  zone = make_zone([{"type": "gpio", "pin": "P8_10"}], active_low=active_low)
 
-  assert zone.zone_valve_thread.active_low is active_low
+  assert zone.actuators[0].active_low is active_low
+
+
+def test_output_active_low_overrides_the_zone(redis_client, gpio):
+  zone = make_zone([{"type": "gpio", "pin": "P8_10", "active_low": False}], active_low=True)
+
+  assert zone.actuators[0].active_low is False
 
 
 def test_valve_thread_reads_the_zone_sensor(redis_client, gpio):
@@ -96,25 +105,14 @@ def test_threads_connect_with_the_redis_config(redis_client, redis_connections, 
   assert redis_connections == [{"host": "redis.local", "port": 6380, "db": 0}] * 2
 
 
-def test_zone_builds_an_actuator_for_each_non_gpio_output(redis_client, gpio):
-  zone = make_zone([{"type": "gpio", "pin": "P8_10"}, RELAY, RELAY])
-
-  assert len(zone.actuators) == 2
-  assert all(isinstance(actuator, MQTTRelay) for actuator in zone.actuators)
-  assert zone.actuators[0].path == "/home/sensors/a"
-  assert zone.actuators[0].mqtt_config is MQTT
-
-
 def test_zone_skips_outputs_of_unknown_type(redis_client, gpio):
   zone = make_zone([{"type": "Toaster"}, RELAY])
 
   assert len(zone.actuators) == 1
 
 
-def test_zone_without_extra_outputs_has_no_actuators(redis_client, gpio):
-  zone = make_zone([{"type": "gpio", "pin": "P8_10"}])
-
-  assert zone.actuators == []
+def test_zone_without_outputs_has_no_actuators(redis_client, gpio):
+  assert make_zone().actuators == []
 
 
 def test_start_starts_the_actuators(redis_client, gpio, monkeypatch):

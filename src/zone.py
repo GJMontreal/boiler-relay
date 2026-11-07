@@ -16,18 +16,13 @@ class Zone():
                                     self,
                                     redis_config)) #not super keen about passing in self
 
-        gpio_pins = [output["pin"] for output in zone_config.outputs
-                     if output.get("type") == "gpio"]
         self.zone_valve_thread = ZoneValveThread(self.input_path,
-                                                 gpio_pins,
-                                                 zone_config.active_low,
                                                  self,
                                                  redis_config)
 
         self.actuators = []
         for output in zone_config.outputs:
-            if output.get("type") == "gpio":
-                continue
+            output = {"active_low": zone_config.active_low, **output}
             actuator = create_output(output, self.input_path, redis_config, mqtt_config)
             if actuator is not None:
                 self.actuators.append(actuator)

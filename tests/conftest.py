@@ -32,12 +32,14 @@ def redis_client(redis_server, redis_connections, monkeypatch):
 
 @pytest.fixture
 def run_ticks(monkeypatch):
-  def run(thread, ticks):
+  def run(thread, ticks, on_tick=None):
     count = 0
 
     def fake_sleep(_):
       nonlocal count
       count += 1
+      if on_tick:
+        on_tick()
       if count >= ticks:
         raise StopLoop
 
@@ -81,7 +83,7 @@ def gpio(monkeypatch, gpio_inputs):
     def input(cls, pin):
       return gpio_inputs.get(pin, 0)
 
-  monkeypatch.setattr(zone_valve_thread, "GPIO", RecordingGPIO)
+  monkeypatch.setattr(actuator, "GPIO", RecordingGPIO)
   monkeypatch.setattr(output_thread, "GPIO", RecordingGPIO)
   monkeypatch.setattr(boiler_thread, "GPIO", RecordingGPIO)
   return calls

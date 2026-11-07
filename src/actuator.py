@@ -1,4 +1,5 @@
 from src.config import MQTTConfig, RedisConfig, RelayConfig
+from src.gpio import GPIO
 from json import dumps, load
 from redis import Redis
 from threading import Thread
@@ -6,6 +7,8 @@ from time import sleep
 from paho.mqtt import client as mqtt_client
 
 class Actuator():
+  output_type = None
+
   def  __init__(self, path, redis_config: RedisConfig, mqtt_config: MQTTConfig = None, output_config: dict = None, update_interval = 0.5) -> None:
     self.path = path
     self.redis = Redis(host=redis_config.host, port=redis_config.port,db=0)
@@ -43,8 +46,34 @@ class Actuator():
   def activate(self, value):
     print(f"{self.path}.value = {value}")
 
+class GPIOOutput(Actuator):
+  output_type = "gpio"
+
+  def __init__(self, path, redis_config: RedisConfig, mqtt_config: MQTTConfig, output_config: dict, update_interval=0.5) -> None:
+    super().__init__(path, redis_config, mqtt_config, output_config, update_interval)
+    self.pin = output_config["pin"]
+    self.active_low = output_config.get("active_low", False)
+    self.config_gpio()
+
+  def config_gpio(self):
+    print(f'configuring GPIO: {self.pin} as Output')
+    GPIO.setup(self.pin, GPIO.OUT)
+    output = GPIO.LOW
+    if self.active_low:
+      output = GPIO.HIGH
+    GPIO.output(self.pin, output)
+    GPIO.cleanup()
+
+  def activate(self, value):
+    output = 1 if value else 0
+    if self.active_low:
+      output = output * -1 + 1
+    GPIO.output(self.pin, output)
+
 # {"Device":"0xB5EA","Send":{"Power":0}}
 class MQTTRelay(Actuator):
+  output_type = "MQTTRelay"
+
   def __init__(self, path, redis_config: RedisConfig, mqtt_config: MQTTConfig, output_config: dict, update_interval=0.5) -> None:
     super().__init__(path, redis_config, mqtt_config, output_config, update_interval)
     self.relay_config = RelayConfig(topic=output_config["topic"], device=output_config["device"])
@@ -61,7 +90,7 @@ def create_output(output_config, path, redis_config, mqtt_config):
     return
 
   type_name = output_config["type"]
-  output_types = {cls.__name__: cls for cls in Actuator.__subclasses__()}
+  output_types = {cls.output_type: cls for cls in Actuator.__subclasses__() if cls.output_type}
   if type_name not in output_types:
     print(f"Unsupported output type: {type_name}")
     return

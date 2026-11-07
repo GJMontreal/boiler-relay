@@ -25,10 +25,11 @@ The bits circled in red are the ones I've written. The UI is implemented as a [H
 Each zone has a temperature sensor, a setpoint and one or more zone valve outputs.
 
 1. A PID loop compares the current temperature to the setpoint and produces a control value between 0 and 1.
-2. The zone valve thread turns that value into a duty cycle over a ten minute window. A control value of 0.3 opens the valve for three minutes of each ten.
-3. The boiler thread reads one call-for-heat input per zone. It turns the boiler and pump on when any zone is calling.
+2. The zone valve thread turns that value into a duty cycle over a ten minute window. A control value of 0.3 opens the valve for three minutes of each ten. It publishes the result as the zone's `heating_cooling_state`.
+3. Each of the zone's outputs follows that state. An output is a local GPIO pin or an MQTT relay.
+4. The boiler thread reads one call-for-heat input per zone. It turns the boiler and pump on when any zone is calling.
 
-A boost flag in redis forces a zone open regardless of the PID output. Outputs can be configured active low per zone.
+A boost flag in redis forces a zone open regardless of the PID output. Gpio outputs can be configured active low per zone or per output.
 
 ## Redis keys
 Every zone is identified by a sensor path such as `/home/sensors/0xFD69`.
