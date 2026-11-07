@@ -40,19 +40,29 @@ class FakeThread:
 def fakes(monkeypatch):
   created = type("Created", (), {"zones": [], "boilers": []})
 
-  def make_zone(zone_config, redis_config, mqtt_config):
+  def make_zone(zone_config, redis_config, mqtt_config, mode="active"):
     zone = FakeThread(zone_config.name)
+    zone.mode = mode
     created.zones.append(zone)
     return zone
 
-  def make_boiler(boiler_config, end_switches):
+  def make_boiler(boiler_config, end_switches, publisher):
     boiler = FakeThread("boiler")
     boiler.end_switches = end_switches
+    boiler.publisher = publisher
+    created.boilers.append(boiler)
+    return boiler
+
+  def make_shadow_boiler(boiler_config, zones, publisher):
+    boiler = FakeThread("boiler")
+    boiler.zones = zones
+    boiler.publisher = publisher
     created.boilers.append(boiler)
     return boiler
 
   monkeypatch.setattr(entry, "Zone", make_zone)
   monkeypatch.setattr(entry, "BoilerThread", make_boiler)
+  monkeypatch.setattr(entry, "ShadowBoilerThread", make_shadow_boiler)
   monkeypatch.setattr(entry.signal, "signal", lambda *args: None)
   return created
 
@@ -81,6 +91,31 @@ def test_build_creates_a_thread_per_zone_and_the_boiler(fakes):
 
   assert [zone.name for zone in zones] == ["Bedrooms"]
   assert boiler.end_switches == ["P8_9"]
+
+
+def test_the_shadow_flag_is_off_by_default():
+  assert entry.parse_arguments([]).shadow is False
+  assert entry.parse_arguments(["--shadow"]).shadow is True
+
+
+def test_build_makes_active_threads_that_publish_under_active(fakes):
+  system = SystemConfig.from_dict(VALID)
+
+  zones, boiler = entry.build(system)
+
+  assert zones[0].mode == "active"
+  assert boiler.publisher.prefix == "boiler_relay/active"
+
+
+def test_build_in_shadow_mode_makes_a_boiler_that_follows_the_zones(fakes):
+  system = SystemConfig.from_dict(VALID)
+
+  zones, boiler = entry.build(system, shadow=True)
+
+  assert zones[0].mode == "shadow"
+  assert boiler.zones == zones
+  assert boiler.publisher.prefix == "boiler_relay/shadow"
+  assert not hasattr(boiler, "end_switches")
 
 
 def test_supervise_returns_zero_when_asked_to_stop():
@@ -132,7 +167,7 @@ def test_main_exits_two_on_an_invalid_config(tmp_path, fakes):
 
 
 def test_main_exits_two_when_a_zone_cannot_be_built(tmp_path, monkeypatch, caplog):
-  def refuse(*args):
+  def refuse(*args, **kwargs):
     raise ValueError("unsupported output type: Toaster")
 
   monkeypatch.setattr(entry, "Zone", refuse)

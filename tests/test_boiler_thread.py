@@ -154,3 +154,61 @@ def test_the_loop_exits_when_stopping_is_set(gpio, monkeypatch):
   thread.run()
 
   assert thread.stopping.is_set()
+
+
+class ZoneStub:
+  def __init__(self, state, has_end_switch=True):
+    self.state = state
+    self.has_end_switch = has_end_switch
+
+
+def make_shadow(zones, redis_client):
+  from boiler_relay.boiler_thread import ShadowBoilerThread
+  from boiler_relay.state_publisher import StatePublisher
+  return ShadowBoilerThread(BoilerConfig(output_gpio="P8_18"), zones, StatePublisher(redis_client, "shadow"))
+
+
+def shadow_call(redis_client):
+  import json
+  return json.loads(redis_client.get("boiler_relay/shadow/boiler"))["call"]
+
+
+def test_the_shadow_boiler_calls_when_a_zone_with_an_end_switch_heats(redis_client, gpio, run_ticks):
+  from boiler_relay.heating_cooling_state import HeatingCoolingState
+  thread = make_shadow([ZoneStub(HeatingCoolingState.OFF), ZoneStub(HeatingCoolingState.HEAT)], redis_client)
+
+  run_ticks(thread, 1)
+
+  assert shadow_call(redis_client) == 1
+
+
+def test_the_shadow_boiler_ignores_zones_without_an_end_switch_or_not_heating(redis_client, gpio, run_ticks):
+  from boiler_relay.heating_cooling_state import HeatingCoolingState
+  zones = [ZoneStub(HeatingCoolingState.OFF), ZoneStub(HeatingCoolingState.HEAT, has_end_switch=False), ZoneStub(None)]
+  thread = make_shadow(zones, redis_client)
+
+  run_ticks(thread, 1)
+
+  assert shadow_call(redis_client) == 0
+
+
+def test_the_shadow_boiler_beats_and_touches_no_gpio(redis_client, gpio, run_ticks):
+  thread = make_shadow([], redis_client)
+
+  run_ticks(thread, 1)
+
+  assert redis_client.get("boiler_relay/shadow/heartbeat") is not None
+  assert gpio == []
+
+
+def test_the_active_boiler_publishes_its_call_and_a_heartbeat(redis_client, gpio, gpio_inputs, run_ticks):
+  from boiler_relay.state_publisher import StatePublisher
+  gpio_inputs["P8_9"] = 1
+  config = BoilerConfig(output_gpio="P8_18")
+  thread = BoilerThread(config, INPUTS, StatePublisher(redis_client, "active"))
+
+  run_ticks(thread, 1)
+
+  import json
+  assert json.loads(redis_client.get("boiler_relay/active/boiler"))["call"] == 1
+  assert redis_client.get("boiler_relay/active/heartbeat") is not None

@@ -9,6 +9,7 @@ from simple_pid import PID
 
 from boiler_relay.heating_cooling_state import HeatingCoolingState
 from boiler_relay.outputs import create_output
+from boiler_relay.state_publisher import ACTIVE, SHADOW, StatePublisher
 
 log = logging.getLogger(__name__)
 
@@ -18,11 +19,14 @@ REPORT_EVERY = 12
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 class Zone(Thread):
-    def __init__(self, zone_config, redis_config, mqtt_config):
+    def __init__(self, zone_config, redis_config, mqtt_config, mode=ACTIVE):
         super().__init__(name=zone_config.name)
         self.input_path = zone_config.sensor_path
         self.output_path = zone_config.control_path
         self.redis = Redis(host=redis_config.host, port=redis_config.port, db=0)
+        self.shadow = mode == SHADOW
+        self.publisher = StatePublisher(self.redis, mode)
+        self.has_end_switch = bool(zone_config.end_switches)
 
         gains = zone_config.pid
         self.pid = PID(gains.kp, gains.ki, gains.kd,
@@ -34,8 +38,10 @@ class Zone(Thread):
         self.cycle = 0
         self.duration = zone_config.control_interval * 60 / self.interval
 
-        self.outputs = [create_output({**output, "active_low": zone_config.active_low}, mqtt_config)
-                        for output in zone_config.outputs]
+        self.outputs = []
+        if not self.shadow:
+            self.outputs = [create_output({**output, "active_low": zone_config.active_low}, mqtt_config)
+                            for output in zone_config.outputs]
 
         self.control_value = 0.0
         self.target_temperature = 0.0
@@ -103,19 +109,23 @@ class Zone(Thread):
     def update(self):
         self.read_sensors()
         self.control_value = self.compute_control_value()
-        self.redis.set(self.output_path, self.control_value)
+        if not self.shadow:
+            self.redis.set(self.output_path, self.control_value)
 
         target_state = self.read_target_state()
         if target_state is None:
+            self.publisher.zone(self.name, self.control_value, None)
             return
 
         state = self.duty_state(target_state)
         for output in self.outputs:
             output.activate(state.value)
 
-        topic = f'{self.input_path}/heating_cooling_state'
-        self.redis.set(topic, state.value)
-        self.redis.publish(topic, state.value)
+        if not self.shadow:
+            topic = f'{self.input_path}/heating_cooling_state'
+            self.redis.set(topic, state.value)
+            self.redis.publish(topic, state.value)
+        self.publisher.zone(self.name, self.control_value, state.value)
 
         self.record(state)
         self.advance_cycle()

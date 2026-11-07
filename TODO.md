@@ -4,10 +4,10 @@ Build order is fixed: hardening and config (done), deploy and shadow, API and UI
 
 ## Step 2: deploy, switch and shadow
 
-- [ ] Add `--shadow` to `python -m boiler_relay`. Read the same sensor keys, compute the same decisions, touch no GPIO, send no MQTT, and write only under `boiler_relay/shadow/`.
-- [ ] Publish zone, boiler and heartbeat state under `boiler_relay/<mode>/` from the active service as well. Keep writing the Homebridge keys from the active service.
+- [x] Add `--shadow` to `python -m boiler_relay`. Read the same sensor keys, compute the same decisions, touch no GPIO, send no MQTT, and write only under `boiler_relay/shadow/`.
+- [x] Publish zone, boiler and heartbeat state under `boiler_relay/<mode>/` from the active service as well. Keep writing the Homebridge keys from the active service.
 - [x] Rename the new service `boiler_relay_v2`, installed in `/var/lib/boiler_relay_v2`, running as `heating` through a `<service_user>` placeholder.
-- [x] Add `boiler_relay_v2_shadow.service`. It conflicts with v2, not with legacy, and is never enabled at boot. It cannot start until `--shadow` exists.
+- [x] Add `boiler_relay_v2_shadow.service`. It conflicts with v2, not with legacy, and is never enabled at boot.
 - [x] Add `Conflicts=` to the v2 unit and a drop-in file for the legacy unit.
 - [x] Keep `switch.sh` away from `mqtt_bridge.service`. The legacy, v2 and shadow services and Homebridge all read what the bridge writes. Note in the deploy docs that the bridge lives in `GJMontreal/mqtt-bridge`.
 - [x] Add `deploy/switch.sh legacy|v2|shadow`. It stops the old service, waits, starts the new one and moves the boot-time enable. It runs over `ssh -t` with sudo.

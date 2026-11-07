@@ -535,3 +535,72 @@ def test_the_loop_exits_when_stopping_is_set(redis_client, gpio, monkeypatch):
   zone.run()
 
   assert zone.stopping.is_set()
+
+
+def make_shadow_zone(value, outputs=(VALVE,), **changes):
+  config = ZoneConfig(sensor_path=SENSOR, name="Bedrooms", outputs=list(outputs), pid_interval="10", **changes)
+  zone = Zone(config, REDIS, MQTT, mode="shadow")
+  zone.pid = FixedPID(value)
+  return zone
+
+
+def test_a_shadow_zone_builds_no_outputs_and_touches_no_gpio(redis_client, gpio):
+  zone = make_shadow_zone(1.0, [VALVE, {"type": "gpio", "pin": "P8_14"}])
+
+  assert zone.outputs == []
+  assert gpio == []
+
+
+def test_a_shadow_zone_builds_no_mqtt_relay(redis_client, gpio):
+  assert make_shadow_zone(1.0, [RELAY]).outputs == []
+
+
+def test_a_shadow_zone_writes_only_under_the_shadow_prefix(redis_client, gpio, run_ticks):
+  seed(redis_client, current=18, target=21, state=1)
+  before = set(redis_client.keys())
+  zone = make_shadow_zone(1.0)
+
+  run_ticks(zone, 3)
+
+  written = set(redis_client.keys()) - before
+  assert written == {b"boiler_relay/shadow/zones/Bedrooms"}
+  assert gpio == []
+  data = json.loads(redis_client.get("boiler_relay/shadow/zones/Bedrooms"))
+  assert data["state"] == 1
+  assert data["control_value"] == 1.0
+
+
+def test_a_shadow_zone_publishes_nothing_on_the_homebridge_channel(redis_client, gpio, run_ticks):
+  seed(redis_client, current=18, target=21, state=1)
+  channel = redis_client.pubsub()
+  channel.subscribe(STATE)
+  channel.get_message()
+
+  run_ticks(make_shadow_zone(1.0), 2)
+
+  assert channel.get_message() is None
+
+
+def test_a_shadow_zone_publishes_a_null_state_before_the_target_state_exists(redis_client, gpio, run_ticks):
+  seed(redis_client, current=18, target=21)
+
+  run_ticks(make_shadow_zone(1.0), 1)
+
+  data = json.loads(redis_client.get("boiler_relay/shadow/zones/Bedrooms"))
+  assert data["state"] is None
+
+
+def test_an_active_zone_also_publishes_under_the_active_prefix(redis_client, gpio, run_ticks):
+  seed(redis_client, current=18, target=21, state=1)
+  zone = make_fixed_zone(1.0, [VALVE])
+
+  run_ticks(zone, 2)
+
+  data = json.loads(redis_client.get("boiler_relay/active/zones/Bedrooms"))
+  assert data["state"] == 1
+  assert redis_client.get(STATE) is not None
+
+
+def test_a_zone_knows_whether_it_has_an_end_switch(redis_client, gpio):
+  assert make_shadow_zone(0.0, [{**VALVE, "end_switch": "P8_9"}]).has_end_switch
+  assert not make_shadow_zone(0.0, [VALVE]).has_end_switch

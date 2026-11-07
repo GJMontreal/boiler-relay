@@ -70,6 +70,6 @@ The script prints the command that copies the units to `/etc/systemd/system` and
 - `v2` runs `boiler_relay_v2` and enables it at boot.
 - `shadow` keeps `boiler_relay` in control and adds `boiler_relay_v2_shadow`. The shadow unit has no `[Install]` section, so it never starts at boot.
 
-`boiler_relay_v2_shadow.service` runs `python -m boiler_relay --shadow`. The flag does not exist yet, so the unit cannot start until it does.
+`boiler_relay_v2_shadow.service` runs `python -m boiler_relay --shadow`. Shadow mode reads the same sensor keys and makes the same decisions, but it drives no GPIO, sends no MQTT and writes only under `boiler_relay/shadow/`. The active service also publishes the same state under `boiler_relay/active/`. Both write `zones/<name>`, `boiler` and `heartbeat` as JSON with a `time` field.
 
 The scripts never touch `mqtt_bridge.service`. The bridge lives in `GJMontreal/mqtt-bridge`, and the legacy, v2 and shadow services and Homebridge all read what it writes.
