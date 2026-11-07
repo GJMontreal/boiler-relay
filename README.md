@@ -64,6 +64,8 @@ The read-only API and web interface live in the `heating-web` repo. It is deploy
 ## Configuration
 Zones, the boiler output and the redis and MQTT endpoints are described in JSON. `config/system_config.json` is the default config file. A zone is one sensor, one PID and one kind of output: local GPIO pins or an MQTT relay. Each zone names its `system`, `hydronic` or `electric`. A gpio output on a hydronic zone may name an `end_switch` pin, and the boiler follows all of them. The config needs at least one hydronic zone with an `end_switch`. A zone can also set `control_interval` (the duty window in minutes) and `pid` gains. The program refuses to start on a config it cannot use, and says why.
 
+The end switch pairing was measured on the device on 2026-11-07 with read-only GPIO reads and the legacy log. Boosting a valve and watching which input rose showed that Common's valve (`P8_8`) reports on `P8_15` and Kitchen's valve (`P8_16`) reports on `P8_7`. That is verified for Common and Kitchen only. The pairing for Study, BackRoom and Bedrooms has not been tested.
+
 ## Status
 The `more_better_modular` branch is the development branch. It replaced the original scripts with the `boiler_relay` package. `deploy.sh`, `deploy/switch.sh` and the systemd units have been written for it and have not been run against the device.
 

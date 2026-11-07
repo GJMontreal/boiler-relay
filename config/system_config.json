@@ -26,7 +26,7 @@
             "name": "Common",
             "system": "hydronic",
             "outputs": [
-                {"type": "gpio", "pin": "P8_8", "end_switch": "P8_7"}
+                {"type": "gpio", "pin": "P8_8", "end_switch": "P8_15"}
             ],
             "pid_interval": 10,
             "control_interval": 10,
@@ -48,7 +48,7 @@
             "name": "Kitchen",
             "system": "hydronic",
             "outputs": [
-                {"type": "gpio", "pin": "P8_16", "end_switch": "P8_15"}
+                {"type": "gpio", "pin": "P8_16", "end_switch": "P8_7"}
             ],
             "pid_interval": 10,
             "control_interval": 10,

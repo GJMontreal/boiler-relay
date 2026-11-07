@@ -165,11 +165,11 @@ def test_system_config_mqtt_is_optional():
 
 
 def test_system_config_derives_the_boiler_inputs_from_the_outputs():
-  second = zone(name="Common", sensor_path="/home/sensors/b", outputs=[{"type": "gpio", "pin": "P8_8", "end_switch": "P8_7"}])
+  second = zone(name="Common", sensor_path="/home/sensors/b", outputs=[{"type": "gpio", "pin": "P8_8", "end_switch": "P8_15"}])
 
   config = SystemConfig.from_dict(system(zones=[ZONE, second]))
 
-  assert config.end_switches == ["P8_9", "P8_7"]
+  assert config.end_switches == ["P8_9", "P8_15"]
 
 
 @pytest.mark.parametrize("section", ["redis", "boiler", "zones"])
@@ -241,8 +241,8 @@ def test_shipped_config_pairs_each_valve_with_its_end_switch():
   config = SystemConfig.from_file(CONFIG_PATH)
   pairs = {(o["pin"], o["end_switch"]) for z in config.zones for o in z.outputs if "end_switch" in o}
 
-  assert pairs == {("P8_10", "P8_9"), ("P8_14", "P8_17"), ("P8_8", "P8_7"),
-                   ("P8_12", "P8_11"), ("P8_16", "P8_15"), ("P8_28", "P8_27")}
+  assert pairs == {("P8_10", "P8_9"), ("P8_14", "P8_17"), ("P8_8", "P8_15"),
+                   ("P8_12", "P8_11"), ("P8_16", "P8_7"), ("P8_28", "P8_27")}
 
 
 def test_shipped_stairwell_zone_drives_the_relay_alone():
