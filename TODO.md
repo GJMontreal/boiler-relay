@@ -4,8 +4,7 @@
 
 - [ ] Add `paho-mqtt` and the package providing `unopt` to `requirements.txt`, or drop `unopt`.
 - [ ] Make `config.json` and `zones.json` match the `system_config.json` zone shape, or delete them.
-- [ ] Create a `ZoneValveThread` in `Zone` and start it.
-- [ ] Fix `Zone.write_row`: define `os`, `LOG_PATH` and the valve thread it uses.
+- [ ] Fix `Zone.write_row_to_csv`: define `os` and `LOG_PATH`.
 - [ ] Port `BoilerThread` into the new startup path.
 - [ ] Pass `RedisConfig` into the threads instead of hardcoding `localhost:6379`.
 
