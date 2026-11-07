@@ -1,5 +1,5 @@
 Adafruit-BBIO==1.2.0
-pkg-resources==0.0.0
 redis==3.5.3
-simple-pid
-paho-mqtt>=2.0
+simple-pid==2.0.1
+paho-mqtt==2.1.0
+typing-extensions==4.7.1
