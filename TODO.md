@@ -24,7 +24,7 @@ The project controls two systems, set per zone by the `system` field. Hydronic i
 - [ ] Publish a real MQTT message from `MQTTRelay` with the real topic and device and check the Zigbee relay switches. Publishing to a broker already passes.
 - [ ] Revisit sending relay commands through redis and the bridge, which would drop paho from the control process. Not now, because the radiator would then depend on the bridge to switch.
 - [ ] Homebridge needs a stairwell thermostat that writes `/home/sensors/stairwell/target_temperature` and `target_heatingcooling_state`. Until it does, the Stairwell zone idles.
-- [ ] Confirm the Bedrooms end-switch pairing: `P8_10` with `P8_9` and `P8_14` with `P8_17`.
+- [x] Confirm the Bedrooms end-switch pairing: `P8_10` with `P8_9` and `P8_14` with `P8_17`.
 - [ ] Review the device's login credentials and remote access.
 - [ ] The `back_room` sensor stopped reporting on 2026-10-24. Check its battery.
 - [ ] Add a GPIO pull-up or pull-down choice for the end-switch inputs if the wiring needs one.
