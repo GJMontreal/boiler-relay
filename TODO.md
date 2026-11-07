@@ -1,6 +1,6 @@
 # TODO
 
-Build order is fixed: hardening and config (done), deploy and shadow, API and UI.
+Build order is fixed: hardening and config (done), deploy and shadow. The API and web interface now live in the heating-web repo, with their own TODO.md.
 
 The project controls two systems, set per zone by the `system` field. Hydronic is the boiler, pump and zone valves on GPIO, with an end switch on each valve. Electric is the Stairwell radiator behind a Zigbee relay over MQTT, with no end switch and no state feedback. Published state lives under `heating/<mode>/`: `zones/<zone name>` carries the zone's `system`, and `hydronic/boiler` carries the boiler call.
 
@@ -18,15 +18,6 @@ The project controls two systems, set per zone by the `system` field. Hydronic i
 - [ ] Compare legacy and shadow per zone and per ten-minute window: mean control value and on-fraction.
 - [ ] First deploy at the house during heating season. Watch each zone open and close once and check the boiler follows the end switches. Roll back with `switch.sh legacy`.
 - [ ] Install `paho-mqtt` 2.x, `simple-pid` and `redis==3.5.3` on the device's Python 3.7 in the new venv.
-
-## Step 3: API and UI
-
-- [ ] `api/`: a read-only FastAPI service on the LAN with no authentication. Pin FastAPI and pydantic versions that support Python 3.7 and check them when the venv is first built. Pinned in `api/requirements.txt`, and `/api/live`, `/api/services` and `/api/logs` exist. History and the unit are still open.
-- [ ] Run it as a new user, `boiler_relay_api`, in the `systemd-journal` group, with its own unit.
-- [ ] Sample redis every 10 seconds into SQLite on the USB drive, keep seven days, and include the legacy keys. Mount the drive by UUID as ext4 with `nofail`. Without the drive, run without history and never write to the eMMC.
-- [ ] Show `mqtt_bridge.service` state and each sensor's age on the Live page. If the bridge dies, every zone calls for no heat after two hours.
-- [ ] Include `mqtt_bridge.service` in the Logs page alongside the control services.
-- [ ] `web/`: plain HTML and JavaScript with a small chart library, served by FastAPI. Pages: Live, Trends, Logs (from the journal) and Compare.
 
 ## Backlog
 
