@@ -10,6 +10,7 @@ from redis.exceptions import RedisError
 
 from boiler_relay.boiler_thread import BoilerThread, ShadowBoilerThread
 from boiler_relay.config import ConfigError, SystemConfig
+from boiler_relay.gpio import GPIO
 from boiler_relay.state_publisher import ACTIVE, SHADOW, StatePublisher, publish_version
 from boiler_relay.version import describe
 from boiler_relay.zone import Zone
@@ -58,6 +59,8 @@ def shutdown(zones, boiler):
 def main(argv=None):
   logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
   args = parse_arguments(argv)
+  if args.shadow:
+    GPIO.use_stub()
 
   try:
     system = SystemConfig.from_file(args.config)

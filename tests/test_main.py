@@ -7,6 +7,7 @@ import pytest
 
 from boiler_relay import __main__ as entry
 from boiler_relay.config import SystemConfig
+from boiler_relay.gpio import GPIOLoader
 
 VALID = {
   "redis": {"host": "localhost", "port": 6379},
@@ -67,6 +68,7 @@ def fakes(monkeypatch, redis_server):
   monkeypatch.setattr(entry, "ShadowBoilerThread", make_shadow_boiler)
   monkeypatch.setattr(entry.signal, "signal", lambda *args: None)
   monkeypatch.setattr(entry, "Redis", lambda **kwargs: fakeredis.FakeRedis(server=redis_server))
+  monkeypatch.setattr(entry, "GPIO", GPIOLoader())
   return created
 
 
