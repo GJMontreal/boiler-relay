@@ -3,14 +3,16 @@ from datetime import datetime, timezone
 from json import loads
 from typing import List, Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
+from api.journal import JournalError, read_journal
 from boiler_relay.state_publisher import ACTIVE, SHADOW, TIME_FORMAT
 from boiler_relay.zone import STALE_AFTER
 
 SERVICES = ("boiler_relay", "boiler_relay_v2", "boiler_relay_v2_shadow", "mqtt_bridge")
 SYSTEMCTL_TIMEOUT = 5
+MAX_LOG_LINES = 500
 
 
 class Reading(BaseModel):
@@ -31,6 +33,13 @@ class ZoneLive(BaseModel):
     boost: Optional[bool]
     active: Optional[dict]
     shadow: Optional[dict]
+
+
+class LogEntry(BaseModel):
+    time: str
+    unit: Optional[str]
+    priority: Optional[int]
+    message: str
 
 
 class ServiceState(BaseModel):
@@ -56,7 +65,7 @@ def age_of(sample_time):
     return max(0.0, (datetime.now(timezone.utc) - reported).total_seconds())
 
 
-def create_app(system, redis, unit_state=unit_state):
+def create_app(system, redis, unit_state=unit_state, read_journal=read_journal):
     app = FastAPI(title="boiler_relay")
 
     def read_json(key):
@@ -102,5 +111,14 @@ def create_app(system, redis, unit_state=unit_state):
     @app.get("/api/services", response_model=List[ServiceState])
     def services():
         return [ServiceState(name=name, state=unit_state(name)) for name in SERVICES]
+
+    @app.get("/api/logs", response_model=List[LogEntry])
+    def logs(unit: Optional[str] = None, lines: int = Query(100, ge=1, le=MAX_LOG_LINES)):
+        if unit is not None and unit not in SERVICES:
+            raise HTTPException(status_code=422, detail=f"unit must be one of {list(SERVICES)}")
+        try:
+            return read_journal([unit] if unit else list(SERVICES), lines)
+        except JournalError as error:
+            raise HTTPException(status_code=503, detail=f"journal unavailable: {error}")
 
     return app
