@@ -29,7 +29,7 @@ Build order is fixed: hardening and config (done), deploy and shadow, API and UI
 ## Backlog
 
 - [ ] Boiler short-cycling protection (a minimum on and off time). Deferred until the problem shows.
-- [ ] Publish a real MQTT message from `MQTTRelay` against the broker and check the Zigbee relay switches.
+- [ ] Publish a real MQTT message from `MQTTRelay` with the real topic and device and check the Zigbee relay switches. Publishing to a broker already passes.
 - [ ] Revisit sending relay commands through redis and the bridge, which would drop paho from the control process. Not now, because the radiator would then depend on the bridge to switch.
 - [ ] Homebridge needs a stairwell thermostat that writes `/home/sensors/stairwell/target_temperature` and `target_heatingcooling_state`. Until it does, the Stairwell zone idles.
 - [ ] Confirm the Bedrooms end-switch pairing: `P8_10` with `P8_9` and `P8_14` with `P8_17`.

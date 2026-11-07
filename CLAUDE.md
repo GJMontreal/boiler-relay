@@ -8,7 +8,7 @@ Python control software for a zone-valve hydronic heating system on a BeagleBone
 
 Known breakage in the new code:
 
-- `MQTTRelay` publishing has only run against a fake paho client, never a broker.
+- `MQTTRelay` publishing has run against a real broker (paho-mqtt 2.2.0 on a Mac, topic `boiler_relay/test`), where the payloads arrived in order and a failed connection warned once and recovered. It has not switched the real Zigbee relay, and a broker dying mid-connection has not been tried.
 - `deploy.sh` and the unit template were rewritten for the package layout and have not been run against a device.
 - The device runs Python 3.7.3. The code parses there, but `paho-mqtt` 2.x and `simple-pid` have not been installed on it.
 
