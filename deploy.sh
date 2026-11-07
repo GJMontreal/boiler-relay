@@ -9,43 +9,54 @@ if [ -z "${REMOTE_USER}" ] || [ -z "${REMOTE_HOST}" ]; then
     exit 1
 fi
 
-PROJECT_NAME=boiler_relay
+SERVICE_NAME=boiler_relay_v2
 SERVICE_USER="${SERVICE_USER:-heating}"
-INSTALL_DIR="/var/lib/${PROJECT_NAME}"
+INSTALL_DIR="/var/lib/${SERVICE_NAME}"
+LEGACY_DIRS=(/var/lib/boiler_relay /home/debian/boiler-relay)
+
+for LEGACY_DIR in "${LEGACY_DIRS[@]}"; do
+    if [ "${INSTALL_DIR%/}" = "${LEGACY_DIR}" ]; then
+        echo "refusing to deploy to the legacy directory ${LEGACY_DIR}"
+        exit 1
+    fi
+done
 
 TEMPLATES=(
     "deploy/setup_python.sh.template"
-    "deploy/boiler_relay.service.template"
+    "deploy/${SERVICE_NAME}.service.template"
+    "deploy/${SERVICE_NAME}_shadow.service.template"
 )
 
 echo "Creating files from templates"
 for INPUT_FILE in "${TEMPLATES[@]}"; do
     OUTPUT_FILE=${INPUT_FILE%.*}
-    sed -e "s/<project_name>/${PROJECT_NAME}/g" -e "s/<service_user>/${SERVICE_USER}/g" "${INPUT_FILE}" > "${OUTPUT_FILE}"
+    sed -e "s/<service_name>/${SERVICE_NAME}/g" -e "s/<service_user>/${SERVICE_USER}/g" "${INPUT_FILE}" > "${OUTPUT_FILE}"
 done
 
-chmod +x deploy/setup_python.sh
+STAGE=$(mktemp -d)
+trap 'rm -rf "${STAGE}"' EXIT
+
+mkdir -p "${STAGE}/boiler_relay/outputs" "${STAGE}/config" "${STAGE}/deploy"
+cp requirements.txt "${STAGE}/"
+cp boiler_relay/*.py "${STAGE}/boiler_relay/"
+cp boiler_relay/outputs/*.py "${STAGE}/boiler_relay/outputs/"
+cp config/system_config.json "${STAGE}/config/"
+cp deploy/setup_python.sh "deploy/${SERVICE_NAME}.service" "deploy/${SERVICE_NAME}_shadow.service" "${STAGE}/deploy/"
+cp -R deploy/boiler_relay.service.d "${STAGE}/deploy/"
+chmod -R u=rwX,go=rX "${STAGE}"
 
 SSH_CMD="ssh ${REMOTE_USER}@${REMOTE_HOST}"
 REMOTE="${REMOTE_USER}@${REMOTE_HOST}"
 
-${SSH_CMD} sudo rm -rf "${INSTALL_DIR}"
 ${SSH_CMD} sudo mkdir -p "${INSTALL_DIR}"
 ${SSH_CMD} sudo chown "${REMOTE_USER}" "${INSTALL_DIR}"
-for DIR in boiler_relay boiler_relay/outputs config deploy; do
-    echo creating dir "${INSTALL_DIR}/${DIR}"
-    ${SSH_CMD} mkdir "${INSTALL_DIR}/${DIR}"
-done
 
 echo copying files
-scp requirements.txt "${REMOTE}:${INSTALL_DIR}/"
-scp boiler_relay/*.py "${REMOTE}:${INSTALL_DIR}/boiler_relay/"
-scp boiler_relay/outputs/*.py "${REMOTE}:${INSTALL_DIR}/boiler_relay/outputs/"
-scp config/system_config.json "${REMOTE}:${INSTALL_DIR}/config/"
-scp deploy/setup_python.sh deploy/boiler_relay.service "${REMOTE}:${INSTALL_DIR}/deploy/"
+rsync -rltp --delete --exclude=/.venv "${STAGE}/" "${REMOTE}:${INSTALL_DIR}/"
 
 echo creating venv
-${SSH_CMD} "${INSTALL_DIR}/deploy/setup_python.sh"
+${SSH_CMD} sh "${INSTALL_DIR}/deploy/setup_python.sh"
 
-echo "to install the service run on the device:"
-echo "sudo cp ${INSTALL_DIR}/deploy/boiler_relay.service /etc/systemd/system && sudo systemctl daemon-reload && sudo systemctl enable --now boiler_relay"
+echo "to install the units and the legacy drop-in run on the device:"
+echo "sudo cp ${INSTALL_DIR}/deploy/*.service /etc/systemd/system/ && sudo mkdir -p /etc/systemd/system/boiler_relay.service.d && sudo cp ${INSTALL_DIR}/deploy/boiler_relay.service.d/conflicts.conf /etc/systemd/system/boiler_relay.service.d/ && sudo systemctl daemon-reload"
+echo "then run deploy/switch.sh ${REMOTE_USER} ${REMOTE_HOST} legacy|v2|shadow"

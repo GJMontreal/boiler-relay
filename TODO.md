@@ -6,13 +6,13 @@ Build order is fixed: hardening and config (done), deploy and shadow, API and UI
 
 - [ ] Add `--shadow` to `python -m boiler_relay`. Read the same sensor keys, compute the same decisions, touch no GPIO, send no MQTT, and write only under `boiler_relay/shadow/`.
 - [ ] Publish zone, boiler and heartbeat state under `boiler_relay/<mode>/` from the active service as well. Keep writing the Homebridge keys from the active service.
-- [ ] Rename the new service `boiler_relay_v2`, installed in `/home/debian/boiler_relay_v2`, running as `boiler_relay_service`. Add a separate `service_user` to the unit template.
-- [ ] Add `boiler_relay_v2_shadow.service`. It conflicts with v2, not with legacy, and is never enabled at boot.
-- [ ] Add `Conflicts=` to the v2 unit and a drop-in file for the legacy unit.
-- [ ] Keep `switch.sh` away from `mqtt_bridge.service`. The legacy, v2 and shadow services and Homebridge all read what the bridge writes. Note in the deploy docs that the bridge lives in `GJMontreal/mqtt-bridge`.
-- [ ] Add `deploy/switch.sh legacy|v2|shadow`. It stops the old service, waits, starts the new one and moves the boot-time enable. It runs over `ssh -t` with sudo.
-- [ ] Rewrite `deploy.sh` to use `rsync --delete` with `.venv` excluded, to derive paths from the service name, and to refuse the legacy directory.
-- [ ] Move `After=redis.service` from `[Service]` to `[Unit]` in the unit template.
+- [x] Rename the new service `boiler_relay_v2`, installed in `/var/lib/boiler_relay_v2`, running as `heating` through a `<service_user>` placeholder.
+- [x] Add `boiler_relay_v2_shadow.service`. It conflicts with v2, not with legacy, and is never enabled at boot. It cannot start until `--shadow` exists.
+- [x] Add `Conflicts=` to the v2 unit and a drop-in file for the legacy unit.
+- [x] Keep `switch.sh` away from `mqtt_bridge.service`. The legacy, v2 and shadow services and Homebridge all read what the bridge writes. Note in the deploy docs that the bridge lives in `GJMontreal/mqtt-bridge`.
+- [x] Add `deploy/switch.sh legacy|v2|shadow`. It stops the old service, waits, starts the new one and moves the boot-time enable. It runs over `ssh -t` with sudo.
+- [x] Rewrite `deploy.sh` to use `rsync --delete` with `.venv` excluded, to derive paths from the service name, and to refuse the legacy directory.
+- [x] Move `After=redis.service` from `[Service]` to `[Unit]` in the unit template.
 - [ ] Compare legacy and shadow per zone and per ten-minute window: mean control value and on-fraction.
 - [ ] First deploy at the house during heating season. Watch each zone open and close once and check the boiler follows the end switches. Roll back with `switch.sh legacy`.
 - [ ] Install `paho-mqtt` 2.x, `simple-pid` and `redis==3.5.3` on the device's Python 3.7 in the new venv.

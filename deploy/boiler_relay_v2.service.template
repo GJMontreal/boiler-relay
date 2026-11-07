@@ -1,0 +1,16 @@
+[Unit]
+Description=Heating Zone and Boiler Control
+After=redis.service
+Conflicts=boiler_relay.service <service_name>_shadow.service
+
+[Service]
+Type=simple
+User=<service_user>
+WorkingDirectory=/var/lib/<service_name>
+ExecStart=/var/lib/<service_name>/.venv/bin/python -m boiler_relay
+Restart=on-failure
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/var/lib/<service_name>
+
+[Install]
+WantedBy=multi-user.target

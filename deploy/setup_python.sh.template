@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-INSTALL_DIR="/var/lib/<project_name>"
+INSTALL_DIR="/var/lib/<service_name>"
 
 cd $INSTALL_DIR
 

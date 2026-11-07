@@ -49,7 +49,7 @@ Every zone is identified by a sensor path such as `/home/sensors/kitchen`.
 Zones, the boiler output and the redis and MQTT endpoints are described in JSON. `config/system_config.json` is the default config file. A zone is one sensor, one PID and one kind of output: local GPIO pins or an MQTT relay. A gpio output may name an `end_switch` pin, and the boiler follows all of them. A zone can also set `control_interval` (the duty window in minutes) and `pid` gains. The program refuses to start on a config it cannot use, and says why.
 
 ## Status
-The `more_better_modular` branch is the development branch. It replaced the original scripts with the `boiler_relay` package. `deploy.sh` and the systemd unit have been updated for it and still need a trial run on the device.
+The `more_better_modular` branch is the development branch. It replaced the original scripts with the `boiler_relay` package. `deploy.sh`, `deploy/switch.sh` and the systemd units have been written for it and have not been run against the device.
 
 ## Running
 ```
@@ -60,5 +60,16 @@ python -m boiler_relay
 A local redis is required. `boiler_relay/gpio.py` uses `Adafruit_BBIO` when it is installed. Without it, a stub switches nothing and a warning is logged at startup.
 
 ## Deploying
-`./deploy.sh <user> <host>` fills in the unit and setup templates from `deploy/`, copies the package and config over ssh and builds a virtualenv on the device. It installs to `/var/lib/boiler_relay` and the unit runs as the `heating` user. It deletes the existing install directory first.
+`./deploy.sh <user> <host>` fills in the unit and setup templates from `deploy/`, syncs the package and config with `rsync --delete` and builds a virtualenv on the device. The service is `boiler_relay_v2`. It installs to `/var/lib/boiler_relay_v2` and runs as `SERVICE_USER` (default `heating`, created by the caller and a member of `gpio`). `.venv` survives the sync. The script refuses `/var/lib/boiler_relay` and `/home/debian/boiler-relay`, which belong to the legacy service.
 
+The script prints the command that copies the units to `/etc/systemd/system` and installs the legacy drop-in. The drop-in, `deploy/boiler_relay.service.d/conflicts.conf`, makes `boiler_relay.service` conflict with v2.
+
+`deploy/switch.sh <user> <host> legacy|v2|shadow` runs over `ssh -t` with sudo. It stops the old services, waits until they are inactive, starts the new ones and moves the boot-time enable. It changes nothing if the target unit is missing or does not stay up.
+
+- `legacy` runs `boiler_relay` and enables it at boot.
+- `v2` runs `boiler_relay_v2` and enables it at boot.
+- `shadow` keeps `boiler_relay` in control and adds `boiler_relay_v2_shadow`. The shadow unit has no `[Install]` section, so it never starts at boot.
+
+`boiler_relay_v2_shadow.service` runs `python -m boiler_relay --shadow`. The flag does not exist yet, so the unit cannot start until it does.
+
+The scripts never touch `mqtt_bridge.service`. The bridge lives in `GJMontreal/mqtt-bridge`, and the legacy, v2 and shadow services and Homebridge all read what it writes.
