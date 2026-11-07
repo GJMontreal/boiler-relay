@@ -64,7 +64,14 @@ The read-only API and web interface live in the `heating-web` repo. It is deploy
 ## Configuration
 Zones, the boiler output and the redis and MQTT endpoints are described in JSON. `config/system_config.json` is the default config file. A zone is one sensor, one PID and one kind of output: local GPIO pins or an MQTT relay. Each zone names its `system`, `hydronic` or `electric`. A gpio output on a hydronic zone may name an `end_switch` pin, and the boiler follows all of them. The config needs at least one hydronic zone with an `end_switch`. A zone can also set `control_interval` (the duty window in minutes) and `pid` gains. The program refuses to start on a config it cannot use, and says why.
 
-The end switch pairing is verified on the device for all five valves. On 2026-11-07, read-only GPIO reads and the legacy log showed that Common's valve (`P8_8`) reports on `P8_15` and Kitchen's valve (`P8_16`) reports on `P8_7`, so the config pairs them that way. The Bedrooms valves (`P8_10` with `P8_9`, `P8_14` with `P8_17`) were tested on the same day and match the config. Study and BackRoom were checked on the device and match the config.
+The end switch pairing is verified on the device for all five valves, by boost tests read through sysfs on 2026-11-07.
+
+- **Common and Kitchen** were swapped in the old config. Common's valve (`P8_8`) reports on `P8_15` and Kitchen's valve (`P8_16`) reports on `P8_7`, so the config pairs them that way.
+- **Bedrooms** (`P8_10` with `P8_9`, `P8_14` with `P8_17`) match the config.
+- **Study** (`P8_12` with `P8_11`) matches the config. `P8_11` rose about 3.5 minutes after the boost and fell about 3 minutes after the close.
+- **BackRoom** (`P8_28` with `P8_27`) matches the config. `P8_27` rose about 3.5 minutes after the boost.
+
+The BackRoom end switch is faulty. After the control loop turned the output off at 16:39:51 local on 2026-11-07, `P8_27` stayed high for about 10 minutes, until the actuator was pushed by hand. Until the switch is replaced, a BackRoom call can leave `P8_27` high and keep the boiler on with no demand.
 
 ## Status
 The `more_better_modular` branch is the development branch. It replaced the original scripts with the `boiler_relay` package. `deploy.sh`, `deploy/switch.sh` and the systemd units have been written for it and have not been run against the device.

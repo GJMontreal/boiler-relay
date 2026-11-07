@@ -17,6 +17,7 @@ The project controls two systems, set per zone by the `system` field. Hydronic i
 - [x] Move `After=redis.service` from `[Service]` to `[Unit]` in the unit template.
 - [x] First deploy at the house during heating season. Watch each zone open and close once and check the boiler follows the end switches. Roll back with `switch.sh legacy`.
 - [x] Install `paho-mqtt` 2.x, `simple-pid` and `redis==3.5.3` on the device's Python 3.7 in the new venv.
+- [ ] Replace the BackRoom end switch (`P8_27`). It stayed high for about 10 minutes after the output turned off on 2026-11-07, and a BackRoom call can keep the boiler on with no demand until then.
 
 ## Backlog
 
