@@ -21,48 +21,11 @@ import os
 
 TIME_CONSTANT = 60 #is this in minutes?
 LOG_PATH = "/tmp/ramdisk/boiler-relay" #our log path should be set elsewhere
-ACTIVE_LOW = True
 
 # these should be on a per zone basis
 Kp = 1
 Ki = 0.01
 Kd = 0.5
-
-class BoilerThread(Thread):
-    def __init__(self,zones):
-        self.zones = zones
-        self.interval = 5
-        self.output_gpio = 'P8_18'
-        self.config_gpio(self.output_gpio)
-        super().__init__()
-
-    def config_gpio(self, gpio):
-        print(f'configuring GPIO: {gpio} as Output')
-        GPIO.setup(gpio, GPIO.OUT)
-        output = GPIO.LOW
-        if ACTIVE_LOW:
-            output = GPIO.HIGH
-        GPIO.output(gpio, output)
-        GPIO.cleanup()
-
-# we should be able to read either a gpio or directly from say redis
-    def run(self):
-        while True:
-            #read each of the inputs
-            combined_state = 0
-            for zone in self.zones:
-                print(f'reading {zone.name} {zone.input_gpio} {GPIO.input(zone.input_gpio)}')
-                combined_state = combined_state or GPIO.input(zone.input_gpio)
-
-            print(f'boiler {combined_state}')
-            output_state = combined_state
-            if ACTIVE_LOW:
-                output_state = combined_state * -1 + 1
-            GPIO.output(self.output_gpio, output_state)
-
-            time.sleep(self.interval)
-
-
 
 class ZoneLoggingThread(Thread):
     def __init__(self,zone):

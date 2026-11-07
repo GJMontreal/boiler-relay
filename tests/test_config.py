@@ -2,7 +2,7 @@ from json import dumps, load as json_load
 
 import pytest
 
-from src.config import MQTTConfig, RedisConfig, ZoneConfig
+from src.config import BoilerConfig, MQTTConfig, RedisConfig, ZoneConfig
 
 
 def test_from_file_builds_dataclass(tmp_path):
@@ -87,3 +87,13 @@ def test_every_zone_in_system_config_loads():
     zones = json_load(file)["zones"]
 
   assert [ZoneConfig(**zone).name for zone in zones] == ["Bedrooms", "Common"]
+
+
+def test_boiler_config_defaults_to_active_low():
+  assert BoilerConfig(output_gpio="P8_18").active_low is True
+
+
+def test_boiler_config_accepts_system_config_shape():
+  config = BoilerConfig(output_gpio="P8_18", control_interval="10")
+
+  assert config.control_interval == 10.0

@@ -20,9 +20,10 @@ Known breakage in the new code:
 
 ## Layout
 
-- `main.py`: new entry point. Reads `--config` (default `config.json`), builds `Zone` objects and starts them.
+- `main.py`: new entry point. Reads `--config` (default `config.json`), builds `Zone` objects and a `BoilerThread`, and starts them.
 - `src/zone.py`: one zone. Owns a `PIDThread`.
-- `src/output_thread.py`: `PIDThread` (reads temperature and setpoint from redis, writes `output_path`), `BoilerThread`, `ZoneLoggingThread`.
+- `src/output_thread.py`: `PIDThread` (reads temperature and setpoint from redis, writes `output_path`), `ZoneLoggingThread`.
+- `src/boiler_thread.py`: `BoilerThread`, turns the boiler output on when any pin in the top-level `inputs` list is high.
 - `src/zone_valve_thread.py`: turns `control_value` into a time-proportioned on/off cycle on the zone GPIOs.
 - `src/actuator.py`: `Actuator` base class that polls redis `<path>/value`, plus `MQTTRelay`.
 - `src/config.py`: dataclass configs with `from_file`.

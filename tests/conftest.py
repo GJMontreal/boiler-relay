@@ -1,7 +1,7 @@
 import fakeredis
 import pytest
 
-from src import actuator, output_thread, zone_valve_thread
+from src import actuator, boiler_thread, output_thread, zone_valve_thread
 
 
 class StopLoop(Exception):
@@ -36,6 +36,7 @@ def run_ticks(monkeypatch):
         raise StopLoop
 
     monkeypatch.setattr(zone_valve_thread, "sleep", fake_sleep)
+    monkeypatch.setattr(boiler_thread, "sleep", fake_sleep)
     monkeypatch.setattr(output_thread.time, "sleep", fake_sleep)
     with pytest.raises(StopLoop):
       thread.run()
@@ -44,7 +45,12 @@ def run_ticks(monkeypatch):
 
 
 @pytest.fixture
-def gpio(monkeypatch):
+def gpio_inputs():
+  return {}
+
+
+@pytest.fixture
+def gpio(monkeypatch, gpio_inputs):
   calls = []
 
   class RecordingGPIO:
@@ -67,8 +73,9 @@ def gpio(monkeypatch):
 
     @classmethod
     def input(cls, pin):
-      return 0
+      return gpio_inputs.get(pin, 0)
 
   monkeypatch.setattr(zone_valve_thread, "GPIO", RecordingGPIO)
   monkeypatch.setattr(output_thread, "GPIO", RecordingGPIO)
+  monkeypatch.setattr(boiler_thread, "GPIO", RecordingGPIO)
   return calls

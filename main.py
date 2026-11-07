@@ -1,6 +1,7 @@
 from __future__ import annotations
 from argparse import ArgumentParser, Namespace
-from src.config import MQTTConfig, RedisConfig, ZoneConfig
+from src.boiler_thread import BoilerThread
+from src.config import BoilerConfig, MQTTConfig, RedisConfig, ZoneConfig
 from src.zone import Zone
 
 from json import load
@@ -70,7 +71,15 @@ if __name__ == "__main__":
     print("Missing Redis configuration")
     redis_config = None
 
+  try:
+    boiler_config = BoilerConfig(**config.boiler)
+  except:
+    print("Missing boiler configuration")
+    boiler_config = None
+
   zones = [create_zone(zone, redis_config) for zone in config.zones]
   [zone.start() for zone in zones if zone is not None]
+  if boiler_config is not None:
+    BoilerThread(boiler_config, getattr(config, "inputs", [])).start()
   print(f"MQTT {mqtt_config}")
   print(f"Redis {redis_config}")

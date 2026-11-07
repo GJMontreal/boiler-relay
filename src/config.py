@@ -30,6 +30,15 @@ class OutputConfig(Config):
   pass
 
 @dataclass
+class BoilerConfig(Config):
+  output_gpio: str
+  control_interval: float = 5.0
+  active_low: bool = True
+
+  def __post_init__(self):
+    self.control_interval = float(self.control_interval)
+
+@dataclass
 class ZoneConfig(Config):
   sensor_path: str
   name: str
