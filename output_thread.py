@@ -164,7 +164,7 @@ class ZoneValveThread(Thread):
         if self.active_low == True:
             output = GPIO.HIGH
         GPIO.output(gpio, output)
-        GPIO.cleanup()
+        GPIO.cleanup() #what is this all about?
 
     def run(self):
         while True:

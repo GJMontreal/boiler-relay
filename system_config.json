@@ -1,0 +1,58 @@
+{
+    "mqtt": {
+        "host": "esplanade.local",
+        "port": 1883,
+        "keep_alive": 60
+    },
+    "redis":{
+      "host": "localhost",
+      "port":6379
+    },
+    "zones": [
+    {
+        "sensor_path": "/home/sensors/0xFD69",
+        "outputs": [
+            {
+                "type": "gpio",
+                "pin": "P8_10"
+            },
+            {
+                "type": "gpio",
+                "pin": "P8_14"
+            }
+        ],
+        "name": "Bedrooms",
+        "pid_interval": "10",
+        "control_interval": "10",
+        "active_low": true
+    },
+    {
+        "sensor_path": "/home/sensors/0x53FE",
+        "outputs": [
+            {
+                "type": "gpio",
+                "pin": "P8_8"
+            },
+            {
+                "type": "MQTTRelay",
+                "topic": "cmnd/tasmota_E3738F/ZbSend",
+                "device": "0xB5EA"
+            }
+        ],
+        "name": "Common",
+        "pid_interval": "10",
+        "control_interval": "10",
+        "active_low": true
+    }],
+    "boiler": {
+        "output_gpio": "P8_18",
+        "control_interval": "10"
+    },
+    "inputs": [
+        "P8_7",
+        "P8_9",
+        "P8_11",
+        "P8_15",
+        "P8_17"
+    ]
+}

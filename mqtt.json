@@ -1,0 +1,5 @@
+{
+    "host": "esplanade.local",
+    "port": 1883,
+    "keep_alive": 60
+}
