@@ -22,7 +22,11 @@ Known breakage in the new code:
 - `boiler_relay/gpio.py`: exports `GPIO`. It is `Adafruit_BBIO.GPIO` when that imports, and a stub that logs otherwise. `gpio_output.py` and `boiler_thread.py` import it from here.
 - `boiler_relay/heating_cooling_state.py`: the `HeatingCoolingState` enum.
 - `config/system_config.json`: the config, with `mqtt` (optional), `redis`, `zones` and `boiler`. Sensor paths are the friendly names the legacy system uses. A zone is one sensor, one PID and one kind of output. Optional zone keys are `control_interval` (duty window in minutes, default 10), `active_low` and `pid` (`kp`, `ki`, `kd`).
-- `deploy.sh`, `deploy/`: copy the project to the device over ssh and build a virtualenv. `*.template` files hold `<service_user>` and `<project_name>` placeholders. The unit runs as `heating` from `/var/lib/boiler_relay`, with the virtualenv in `.venv`. The generated `setup_python.sh` and `boiler_relay.service` are gitignored.
+- `deploy.sh`, `deploy/`: sync the project to the device with `rsync --delete` and build a virtualenv. `*.template` files hold `<service_name>` and `<service_user>` placeholders. The service is `boiler_relay_v2`, installed in `/var/lib/boiler_relay_v2` with the virtualenv in `.venv`, which the sync keeps. It runs as `SERVICE_USER`, default `heating`, which the caller creates. `deploy.sh` refuses `/var/lib/boiler_relay` and `/home/debian/boiler-relay`, the legacy service's locations. The generated `setup_python.sh`, `boiler_relay_v2.service` and `boiler_relay_v2_shadow.service` are gitignored.
+  - `boiler_relay_v2.service` conflicts with `boiler_relay.service` and the shadow unit.
+  - `boiler_relay_v2_shadow.service` conflicts with v2 only and has no `[Install]` section, so it never starts at boot. It runs `python -m boiler_relay --shadow`, and it cannot start until that flag exists.
+  - `deploy/boiler_relay.service.d/conflicts.conf` is the legacy unit's drop-in. It makes legacy conflict with v2. `deploy.sh` prints the command that installs the units and the drop-in on the device.
+  - `deploy/switch.sh <user> <host> legacy|v2|shadow` runs over `ssh -t` with sudo. It stops the old services and waits until they are inactive. It starts the new ones and moves the boot-time enable only after they stay up. `shadow` starts legacy and the shadow unit, because stopping v2 alone would leave the boiler uncontrolled. It never touches `mqtt_bridge.service`.
 - `docs/img/`: images for the README.
 
 ## Redis contract
