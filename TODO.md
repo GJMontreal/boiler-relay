@@ -16,7 +16,7 @@ The project controls two systems, set per zone by the `system` field. Hydronic i
 - [x] Rewrite `deploy.sh` to use `rsync --delete` with `.venv` excluded, to derive paths from the service name, and to refuse the legacy directory.
 - [x] Move `After=redis.service` from `[Service]` to `[Unit]` in the unit template.
 - [x] First deploy at the house during heating season. Watch each zone open and close once and check the boiler follows the end switches. Roll back with `switch.sh legacy`.
-- [ ] Install `paho-mqtt` 2.x, `simple-pid` and `redis==3.5.3` on the device's Python 3.7 in the new venv.
+- [x] Install `paho-mqtt` 2.x, `simple-pid` and `redis==3.5.3` on the device's Python 3.7 in the new venv.
 
 ## Backlog
 
