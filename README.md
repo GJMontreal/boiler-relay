@@ -85,10 +85,10 @@ At startup the service sets `heating/versions/boiler-relay` to JSON with `versio
 
 The script prints the command that copies the units to `/etc/systemd/system` and installs the legacy drop-in. The drop-in, `deploy/boiler_relay.service.d/conflicts.conf`, makes `boiler_relay.service` conflict with v2.
 
-`deploy/switch.sh <user> <host> legacy|v2|shadow` runs over `ssh -t` with sudo. It stops the old services, waits until they are inactive, starts the new ones and moves the boot-time enable. It changes nothing if the target unit is missing or does not stay up.
+`deploy/switch.sh <user> <host> legacy|v2|shadow [--confirm]` runs over `ssh -t` with sudo. It stops the old services, waits until they are inactive, starts the new ones and moves the boot-time enable. It changes nothing if the target unit is missing or does not stay up.
 
 - `legacy` runs `boiler_relay` and enables it at boot.
-- `v2` runs `boiler_relay_v2` and enables it at boot.
+- `v2` runs `boiler_relay_v2` and enables it at boot. Starting it stops the legacy service at once, so the script prints the running services it will stop and refuses to go on without `--confirm`.
 - `shadow` keeps `boiler_relay` in control and adds `boiler_relay_v2_shadow`. The shadow unit has no `[Install]` section, so it never starts at boot.
 
 `boiler_relay_v2_shadow.service` runs `python -m boiler_relay --shadow`. Shadow mode reads the same sensor keys and makes the same decisions, but it drives no GPIO, sends no MQTT and writes only under `heating/shadow/`. The active service publishes the same keys under `heating/active/`.

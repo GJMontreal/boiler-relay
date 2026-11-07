@@ -1,12 +1,24 @@
 #!/bin/bash
 set -e
 
-REMOTE_USER=$1
-REMOTE_HOST=$2
-TARGET=$3
+USAGE="usage: deploy/switch.sh <user> <host> legacy|v2|shadow [--confirm]"
 
-if [ -z "${REMOTE_USER}" ] || [ -z "${REMOTE_HOST}" ]; then
-    echo "usage: deploy/switch.sh <user> <host> legacy|v2|shadow"
+CONFIRM=0
+ARGS=()
+for ARG in "$@"; do
+    case "${ARG}" in
+        --confirm) CONFIRM=1 ;;
+        -*) echo "${USAGE}"; exit 1 ;;
+        *) ARGS+=("${ARG}") ;;
+    esac
+done
+
+REMOTE_USER=${ARGS[0]}
+REMOTE_HOST=${ARGS[1]}
+TARGET=${ARGS[2]}
+
+if [ -z "${REMOTE_USER}" ] || [ -z "${REMOTE_HOST}" ] || [ "${#ARGS[@]}" -gt 3 ]; then
+    echo "${USAGE}"
     exit 1
 fi
 
@@ -20,7 +32,7 @@ case "${TARGET}" in
     v2) STOP=("${LEGACY}" "${SHADOW}"); START=("${V2}"); ENABLE=${V2}; DISABLE=${LEGACY} ;;
     shadow) STOP=("${V2}"); START=("${LEGACY}" "${SHADOW}"); ENABLE=${LEGACY}; DISABLE=${V2} ;;
     *)
-        echo "usage: deploy/switch.sh <user> <host> legacy|v2|shadow"
+        echo "${USAGE}"
         exit 1
         ;;
 esac
@@ -46,6 +58,24 @@ for UNIT in "${START[@]}"; do
         exit 1
     fi
 done
+
+if [ "${TARGET}" = v2 ]; then
+    RUNNING=()
+    for UNIT in "${STOP[@]}"; do
+        if unit_exists "${UNIT}" && unit_active "${UNIT}"; then
+            RUNNING+=("${UNIT}")
+        fi
+    done
+    if [ "${#RUNNING[@]}" -gt 0 ]; then
+        echo "switching to v2 will stop: ${RUNNING[*]}"
+    else
+        echo "switching to v2 will stop nothing, no other control service is running"
+    fi
+    if [ "${CONFIRM}" != 1 ]; then
+        echo "nothing was changed, run again with --confirm to go ahead"
+        exit 1
+    fi
+fi
 
 for UNIT in "${STOP[@]}"; do
     if unit_exists "${UNIT}"; then
