@@ -22,7 +22,7 @@ Known breakage in the new code:
 - `boiler_relay/gpio.py`: exports `GPIO`. It is `Adafruit_BBIO.GPIO` when that imports, and a stub that logs otherwise. `gpio_output.py` and `boiler_thread.py` import it from here.
 - `boiler_relay/heating_cooling_state.py`: the `HeatingCoolingState` enum.
 - `config/system_config.json`: the config, with `mqtt` (optional), `redis`, `zones` and `boiler`. Sensor paths are the friendly names the legacy system uses. A zone is one sensor, one PID and one kind of output. Optional zone keys are `control_interval` (duty window in minutes, default 10), `active_low` and `pid` (`kp`, `ki`, `kd`).
-- `deploy.sh`, `deploy/`: copy the project to the device over ssh and build a virtualenv. `*.template` files hold `<user_name>` and `<project_name>` placeholders. The generated `setup_python.sh` and `boiler_relay.service` are gitignored.
+- `deploy.sh`, `deploy/`: copy the project to the device over ssh and build a virtualenv. `*.template` files hold `<service_user>` and `<project_name>` placeholders. The unit runs as `heating` from `/var/lib/boiler_relay`, with the virtualenv in `.venv`. The generated `setup_python.sh` and `boiler_relay.service` are gitignored.
 - `docs/img/`: images for the README.
 
 ## Redis contract

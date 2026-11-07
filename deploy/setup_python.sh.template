@@ -1,5 +1,7 @@
 #!/bin/sh
-INSTALL_DIR="/home/<user_name>/<project_name>"
+set -e
+
+INSTALL_DIR="/var/lib/<project_name>"
 
 cd $INSTALL_DIR
 

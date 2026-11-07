@@ -60,5 +60,5 @@ python -m boiler_relay
 A local redis is required. `boiler_relay/gpio.py` uses `Adafruit_BBIO` when it is installed. Without it, a stub switches nothing and a warning is logged at startup.
 
 ## Deploying
-`./deploy.sh <user> <host>` fills in the unit and setup templates from `deploy/`, copies the package and config over ssh and builds a virtualenv on the device. It deletes the existing install directory first.
+`./deploy.sh <user> <host>` fills in the unit and setup templates from `deploy/`, copies the package and config over ssh and builds a virtualenv on the device. It installs to `/var/lib/boiler_relay` and the unit runs as the `heating` user. It deletes the existing install directory first.
 

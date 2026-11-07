@@ -4,12 +4,12 @@ Description=Heating Zone and Boiler Control
 [Service]
 After=redis.service
 Type=simple
-User=<user_name>
+User=<service_user>
 WorkingDirectory=/var/lib/<project_name>
-ExecStart=/home/<user_name>/<project_name>/.venv/bin/python -m boiler_relay
+ExecStart=/var/lib/<project_name>/.venv/bin/python -m boiler_relay
 Restart=on-failure
 Environment=PYTHONUNBUFFERED=1
-Environment=PYTHONPATH=/home/<user_name>/<project_name>
+Environment=PYTHONPATH=/var/lib/<project_name>
 
 [Install]
 WantedBy=multi-user.target
