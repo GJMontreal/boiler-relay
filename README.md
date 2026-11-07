@@ -73,8 +73,13 @@ python -m boiler_relay
 ```
 A local redis is required. `boiler_relay/gpio.py` uses `Adafruit_BBIO` when it is installed. Without it, a stub switches nothing and a warning is logged at startup.
 
+## Versions
+`boiler_relay/version.py` holds the version in `__version__`. Each service has its own semantic version, and each release is a `vX.Y.Z` git tag. `python -m boiler_relay --version` prints `boiler_relay <version> (<commit>)`. The commit comes from `build_info.json`, which `deploy.sh` writes next to the package. It is the short commit hash, with `-dirty` added when the working tree has changes. The commit reads `unknown` when the file is missing.
+
+At startup the service sets `heating/versions/boiler-relay` to JSON with `version`, `commit` and the start `time`. It does this in active and shadow mode alike, and the key name does not include the mode. If redis is down at startup, it logs a warning and keeps running without the key.
+
 ## Deploying
-`./deploy.sh <user> <host>` fills in the unit and setup templates from `deploy/`, syncs the package and config with `rsync --delete` and builds a virtualenv on the device. The service is `boiler_relay_v2`. It installs to `/var/lib/boiler_relay_v2` and runs as `SERVICE_USER` (default `heating`, created by the caller and a member of `gpio`). `.venv` survives the sync. The script refuses `/var/lib/boiler_relay` and `/home/debian/boiler-relay`, which belong to the legacy service.
+`./deploy.sh <user> <host>` fills in the unit and setup templates from `deploy/`, syncs the package, config and `build_info.json` with `rsync --delete` and builds a virtualenv on the device. The service is `boiler_relay_v2`. It installs to `/var/lib/boiler_relay_v2` and runs as `SERVICE_USER` (default `heating`, created by the caller and a member of `gpio`). `.venv` survives the sync. The script refuses `/var/lib/boiler_relay` and `/home/debian/boiler-relay`, which belong to the legacy service.
 
 The script prints the command that copies the units to `/etc/systemd/system` and installs the legacy drop-in. The drop-in, `deploy/boiler_relay.service.d/conflicts.conf`, makes `boiler_relay.service` conflict with v2.
 
