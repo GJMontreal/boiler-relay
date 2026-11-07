@@ -2,10 +2,12 @@
 
 Build order is fixed: hardening and config (done), deploy and shadow, API and UI.
 
+The project controls two systems, set per zone by the `system` field. Hydronic is the boiler, pump and zone valves on GPIO, with an end switch on each valve. Electric is the Stairwell radiator behind a Zigbee relay over MQTT, with no end switch and no state feedback. Published state lives under `heating/<mode>/`: `zones/<zone name>` carries the zone's `system`, and `hydronic/boiler` carries the boiler call.
+
 ## Step 2: deploy, switch and shadow
 
-- [x] Add `--shadow` to `python -m boiler_relay`. Read the same sensor keys, compute the same decisions, touch no GPIO, send no MQTT, and write only under `boiler_relay/shadow/`.
-- [x] Publish zone, boiler and heartbeat state under `boiler_relay/<mode>/` from the active service as well. Keep writing the Homebridge keys from the active service.
+- [x] Add `--shadow` to `python -m boiler_relay`. Read the same sensor keys, compute the same decisions, touch no GPIO, send no MQTT, and write only under `heating/shadow/`.
+- [x] Publish zone, boiler and heartbeat state under `heating/<mode>/` from the active service as well. Keep writing the Homebridge keys from the active service.
 - [x] Rename the new service `boiler_relay_v2`, installed in `/var/lib/boiler_relay_v2`, running as `heating` through a `<service_user>` placeholder.
 - [x] Add `boiler_relay_v2_shadow.service`. It conflicts with v2, not with legacy, and is never enabled at boot.
 - [x] Add `Conflicts=` to the v2 unit and a drop-in file for the legacy unit.
