@@ -19,7 +19,7 @@ Build order is fixed: hardening and config (done), deploy and shadow, API and UI
 
 ## Step 3: API and UI
 
-- [ ] `api/`: a read-only FastAPI service on the LAN with no authentication. Pin FastAPI and pydantic versions that support Python 3.7 and check them when the venv is first built.
+- [ ] `api/`: a read-only FastAPI service on the LAN with no authentication. Pin FastAPI and pydantic versions that support Python 3.7 and check them when the venv is first built. Pinned in `api/requirements.txt`, and `/api/live` and `/api/services` exist. Logs, history and the unit are still open.
 - [ ] Run it as a new user, `boiler_relay_api`, in the `systemd-journal` group, with its own unit.
 - [ ] Sample redis every 10 seconds into SQLite on the USB drive, keep seven days, and include the legacy keys. Mount the drive by UUID as ext4 with `nofail`. Without the drive, run without history and never write to the eMMC.
 - [ ] Show `mqtt_bridge.service` state and each sensor's age on the Live page. If the bridge dies, every zone calls for no heat after two hours.
