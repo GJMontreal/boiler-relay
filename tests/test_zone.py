@@ -3,7 +3,7 @@ import pytest
 from src.config import RedisConfig, ZoneConfig
 from src.zone import Zone
 
-REDIS = RedisConfig(host="localhost", port=6379)
+REDIS = RedisConfig(host="redis.local", port=6380)
 
 
 def make_zone(outputs=(), active_low=False):
@@ -85,3 +85,9 @@ def test_write_row_formats_the_sample(redis_client, gpio, tmp_path, monkeypatch)
   row = (tmp_path / "Bedrooms_pid.csv").read_text().strip().split(",")
   assert row[:4] == ["t0", "18.0", "21.0", "60"]
   assert len(row) == 7
+
+
+def test_threads_connect_with_the_redis_config(redis_client, redis_connections, gpio):
+  make_zone()
+
+  assert redis_connections == [{"host": "redis.local", "port": 6380, "db": 0}] * 2

@@ -60,7 +60,7 @@ class PIDThread(Thread):
 #we'll need to add a way to log the output, an option and path
 #while developing some kind of algorithm, we can gather data
 
-    def __init__(self, input_path, output_path, interval, zone):
+    def __init__(self, input_path, output_path, interval, zone, redis_config):
         self.zone = zone
         print(f'init PID thread for: {zone.name}')
         self.input_path = input_path
@@ -68,8 +68,7 @@ class PIDThread(Thread):
         self.pid_interval = interval
         self.last_sample_time = ""
 
-# the redis config needs to be passed in
-        self.r = redis.Redis(host='localhost',port=6379,db=0)
+        self.r = redis.Redis(host=redis_config.host, port=redis_config.port, db=0)
 
         self.pid = self.init_pid()
         self.control_value = float(0.0)

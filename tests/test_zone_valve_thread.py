@@ -2,14 +2,16 @@ from types import SimpleNamespace
 
 import pytest
 
+from src.config import RedisConfig
 from src.zone_valve_thread import ZoneValveThread
 
 SENSOR = "/home/sensors/a"
 ZONE = SimpleNamespace(name="Test")
+REDIS = RedisConfig(host="localhost", port=6379)
 
 
 def make_thread(active_low=False, pins=("P8_10",)):
-  return ZoneValveThread(SENSOR, list(pins), active_low, ZONE)
+  return ZoneValveThread(SENSOR, list(pins), active_low, ZONE, REDIS)
 
 
 def seed(redis_client, state=1, control_value=0.3):

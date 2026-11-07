@@ -1,11 +1,13 @@
 import json
 from types import SimpleNamespace
 
+from src.config import RedisConfig
 from src.output_thread import PIDThread
 
 INPUT = "/home/sensors/a"
 OUTPUT = "/home/sensors/a/control_value"
 ZONE = SimpleNamespace(name="Test", last_sample_time=None)
+REDIS = RedisConfig(host="localhost", port=6379)
 
 
 def seed(redis_client, current, target):
@@ -15,7 +17,7 @@ def seed(redis_client, current, target):
 
 def test_cold_room_calls_for_heat(redis_client, run_ticks):
   seed(redis_client, current=15, target=21)
-  thread = PIDThread(INPUT, OUTPUT, 0, ZONE)
+  thread = PIDThread(INPUT, OUTPUT, 0, ZONE, REDIS)
   thread.pid.sample_time = 0
 
   run_ticks(thread, 2)
@@ -25,7 +27,7 @@ def test_cold_room_calls_for_heat(redis_client, run_ticks):
 
 def test_warm_room_calls_for_nothing(redis_client, run_ticks):
   seed(redis_client, current=25, target=21)
-  thread = PIDThread(INPUT, OUTPUT, 0, ZONE)
+  thread = PIDThread(INPUT, OUTPUT, 0, ZONE, REDIS)
   thread.pid.sample_time = 0
 
   run_ticks(thread, 2)
@@ -35,7 +37,7 @@ def test_warm_room_calls_for_nothing(redis_client, run_ticks):
 
 def test_output_is_limited_to_unit_range(redis_client, run_ticks):
   seed(redis_client, current=-40, target=40)
-  thread = PIDThread(INPUT, OUTPUT, 0, ZONE)
+  thread = PIDThread(INPUT, OUTPUT, 0, ZONE, REDIS)
   thread.pid.sample_time = 0
 
   run_ticks(thread, 3)
@@ -45,7 +47,7 @@ def test_output_is_limited_to_unit_range(redis_client, run_ticks):
 
 def test_records_sample_time(redis_client, run_ticks):
   seed(redis_client, current=18, target=21)
-  thread = PIDThread(INPUT, OUTPUT, 0, ZONE)
+  thread = PIDThread(INPUT, OUTPUT, 0, ZONE, REDIS)
   thread.pid.sample_time = 0
 
   run_ticks(thread, 2)
@@ -54,7 +56,7 @@ def test_records_sample_time(redis_client, run_ticks):
 
 
 def test_missing_temperature_does_not_crash(redis_client, run_ticks):
-  thread = PIDThread(INPUT, OUTPUT, 0, ZONE)
+  thread = PIDThread(INPUT, OUTPUT, 0, ZONE, REDIS)
   thread.pid.sample_time = 0
 
   run_ticks(thread, 2)

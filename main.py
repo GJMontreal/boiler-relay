@@ -68,8 +68,8 @@ if __name__ == "__main__":
   try:
     redis_config = RedisConfig(**config.redis)
   except:
-    print("Missing Redis configuration")
-    redis_config = None
+    print("Missing Redis configuration! Exiting")
+    exit()
 
   try:
     boiler_config = BoilerConfig(**config.boiler)

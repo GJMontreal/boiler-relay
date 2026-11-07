@@ -8,7 +8,7 @@ from src.heating_cooling_state import HeatingCoolingState
 
 
 class ZoneValveThread(Thread):
-    def __init__(self, sensor_path, output_gpio, active_low, zone):
+    def __init__(self, sensor_path, output_gpio, active_low, zone, redis_config):
         self.zone = zone
         self.sensor_path = sensor_path
         self.output_gpio = output_gpio
@@ -17,7 +17,7 @@ class ZoneValveThread(Thread):
         for gpio in self.output_gpio:
             self.config_gpio(gpio)
 
-        self.r = Redis(host='localhost',port=6379,db=0) #the host and port should be in a config
+        self.r = Redis(host=redis_config.host, port=redis_config.port, db=0)
         self.interval = 5
         self.cycle = 0
         self.duration = 10 * 60 / self.interval

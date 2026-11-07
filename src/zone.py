@@ -12,14 +12,16 @@ class Zone():
         self.pid_thread = ( PIDThread(self.input_path,
                                       self.output_path,
                                     zone_config.pid_interval,
-                                    self)) #not super keen about passing in self
+                                    self,
+                                    redis_config)) #not super keen about passing in self
 
         gpio_pins = [output["pin"] for output in zone_config.outputs
                      if output.get("type") == "gpio"]
         self.zone_valve_thread = ZoneValveThread(self.input_path,
                                                  gpio_pins,
                                                  zone_config.active_low,
-                                                 self)
+                                                 self,
+                                                 redis_config)
 
         self.control_value = 0
         self.target_temperature = 0

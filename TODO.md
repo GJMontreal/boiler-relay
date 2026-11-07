@@ -4,7 +4,6 @@
 
 - [ ] Add `paho-mqtt` and the package providing `unopt` to `requirements.txt`, or drop `unopt`.
 - [ ] Make `config.json` and `zones.json` match the `system_config.json` zone shape, or delete them.
-- [ ] Pass `RedisConfig` into the threads instead of hardcoding `localhost:6379`.
 
 ## Outputs
 

@@ -14,14 +14,20 @@ def redis_server():
 
 
 @pytest.fixture
-def redis_client(redis_server, monkeypatch):
+def redis_connections():
+  return []
+
+
+@pytest.fixture
+def redis_client(redis_server, redis_connections, monkeypatch):
   def make_client(*args, **kwargs):
+    redis_connections.append(kwargs)
     return fakeredis.FakeRedis(server=redis_server)
 
   monkeypatch.setattr(actuator, "Redis", make_client)
   monkeypatch.setattr(zone_valve_thread, "Redis", make_client)
   monkeypatch.setattr(output_thread.redis, "Redis", make_client)
-  return make_client()
+  return fakeredis.FakeRedis(server=redis_server)
 
 
 @pytest.fixture
