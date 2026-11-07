@@ -14,6 +14,7 @@ RELAY = {"type": "MQTTRelay", "topic": "cmnd/x/ZbSend", "device": "0xB5EA"}
 ZONE = {
   "sensor_path": "/home/sensors/a",
   "name": "Bedrooms",
+  "system": "hydronic",
   "outputs": [VALVE],
   "pid_interval": "10",
   "control_interval": "10",
@@ -251,3 +252,56 @@ def test_shipped_stairwell_zone_drives_the_relay_alone():
   assert stairwell.sensor_path == "/home/sensors/stairwell"
   assert [o["type"] for o in stairwell.outputs] == ["MQTTRelay"]
   assert stairwell.end_switches == []
+
+
+@pytest.mark.parametrize("value", ["hydronic", "electric"])
+def test_zone_config_accepts_each_system(value):
+  outputs = [RELAY] if value == "electric" else [VALVE]
+
+  assert ZoneConfig(**zone(system=value, outputs=outputs)).system == value
+
+
+def test_zone_config_rejects_an_unknown_system():
+  with pytest.raises(ConfigError, match="Bedrooms.*system"):
+    ZoneConfig(**zone(system="steam"))
+
+
+def test_system_config_rejects_a_zone_without_a_system():
+  data = {k: v for k, v in ZONE.items() if k != "system"}
+
+  with pytest.raises(ConfigError, match="Bedrooms.*system"):
+    SystemConfig.from_dict(system(zones=[data]))
+
+
+def test_zone_config_rejects_an_electric_zone_with_an_end_switch():
+  with pytest.raises(ConfigError, match="electric zone has no end_switch"):
+    ZoneConfig(**zone(system="electric", outputs=[VALVE]))
+
+
+def test_an_electric_zone_may_use_any_output_type():
+  electric = zone(name="Stairwell", sensor_path="/home/sensors/s", system="electric", outputs=[RELAY])
+
+  config = SystemConfig.from_dict(system(zones=[ZONE, electric]))
+
+  assert [z.system for z in config.zones] == ["hydronic", "electric"]
+  assert config.end_switches == ["P8_9"]
+
+
+def test_system_config_needs_a_hydronic_zone_with_an_end_switch():
+  electric = zone(name="Stairwell", sensor_path="/home/sensors/s", system="electric", outputs=[RELAY])
+
+  with pytest.raises(ConfigError, match="hydronic zone with an end_switch"):
+    SystemConfig.from_dict(system(zones=[electric]))
+
+
+def test_a_hydronic_zone_without_an_end_switch_does_not_satisfy_the_boiler():
+  bare = zone(outputs=[{"type": "gpio", "pin": "P8_10"}])
+
+  with pytest.raises(ConfigError, match="hydronic zone with an end_switch"):
+    SystemConfig.from_dict(system(zones=[bare]))
+
+
+def test_shipped_config_marks_only_the_stairwell_electric():
+  config = SystemConfig.from_file(CONFIG_PATH)
+
+  assert [z.name for z in config.zones if z.system == "electric"] == ["Stairwell"]

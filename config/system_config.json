@@ -12,6 +12,7 @@
         {
             "sensor_path": "/home/sensors/bedroom",
             "name": "Bedrooms",
+            "system": "hydronic",
             "outputs": [
                 {"type": "gpio", "pin": "P8_10", "end_switch": "P8_9"},
                 {"type": "gpio", "pin": "P8_14", "end_switch": "P8_17"}
@@ -23,6 +24,7 @@
         {
             "sensor_path": "/home/sensors/living_room",
             "name": "Common",
+            "system": "hydronic",
             "outputs": [
                 {"type": "gpio", "pin": "P8_8", "end_switch": "P8_7"}
             ],
@@ -33,6 +35,7 @@
         {
             "sensor_path": "/home/sensors/front_room",
             "name": "Study",
+            "system": "hydronic",
             "outputs": [
                 {"type": "gpio", "pin": "P8_12", "end_switch": "P8_11"}
             ],
@@ -43,6 +46,7 @@
         {
             "sensor_path": "/home/sensors/kitchen",
             "name": "Kitchen",
+            "system": "hydronic",
             "outputs": [
                 {"type": "gpio", "pin": "P8_16", "end_switch": "P8_15"}
             ],
@@ -53,6 +57,7 @@
         {
             "sensor_path": "/home/sensors/back_room",
             "name": "BackRoom",
+            "system": "hydronic",
             "outputs": [
                 {"type": "gpio", "pin": "P8_28", "end_switch": "P8_27"}
             ],
@@ -63,6 +68,7 @@
         {
             "sensor_path": "/home/sensors/stairwell",
             "name": "Stairwell",
+            "system": "electric",
             "outputs": [
                 {"type": "MQTTRelay", "topic": "cmnd/tasmota_E3738F/ZbSend", "device": "0xB5EA"}
             ],

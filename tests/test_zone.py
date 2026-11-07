@@ -60,6 +60,7 @@ def make_zone(outputs=(), active_low=False, mqtt=MQTT, **changes):
     name="Bedrooms",
     outputs=list(outputs),
     pid_interval="10",
+    system="hydronic",
     active_low=active_low,
     **changes,
   )
@@ -538,7 +539,7 @@ def test_the_loop_exits_when_stopping_is_set(redis_client, gpio, monkeypatch):
 
 
 def make_shadow_zone(value, outputs=(VALVE,), **changes):
-  config = ZoneConfig(sensor_path=SENSOR, name="Bedrooms", outputs=list(outputs), pid_interval="10", **changes)
+  config = ZoneConfig(sensor_path=SENSOR, name="Bedrooms", outputs=list(outputs), pid_interval="10", system="hydronic", **changes)
   zone = Zone(config, REDIS, MQTT, mode="shadow")
   zone.pid = FixedPID(value)
   return zone

@@ -14,6 +14,7 @@ CONFIG = {
   "zones": [{
     "sensor_path": SENSOR,
     "name": "Bedrooms",
+    "system": "hydronic",
     "outputs": [{"type": "gpio", "pin": "P8_10", "end_switch": "P8_9"}],
     "pid_interval": 10,
   }],

@@ -7,6 +7,10 @@ from json import load as json_load
 class ConfigError(Exception):
   pass
 
+HYDRONIC = "hydronic"
+ELECTRIC = "electric"
+SYSTEMS = (HYDRONIC, ELECTRIC)
+
 @dataclass 
 class Config():
   pass
@@ -49,6 +53,7 @@ class ZoneConfig(Config):
   name: str
   outputs: list[dict]
   pid_interval: float
+  system: str
   control_interval: float = 10.0
   active_low: bool = False
   pid: PIDConfig = None
@@ -61,6 +66,10 @@ class ZoneConfig(Config):
     self.validate()
 
   def validate(self):
+    if self.system not in SYSTEMS:
+      raise ConfigError(f"zone {self.name}: system must be one of {list(SYSTEMS)}, found {self.system!r}")
+    if self.system == ELECTRIC and self.end_switches:
+      raise ConfigError(f"zone {self.name}: an electric zone has no end_switch")
     if self.pid_interval <= 0 or self.control_interval <= 0:
       raise ConfigError(f"zone {self.name}: pid_interval and control_interval must be positive")
     for output in self.outputs:
@@ -148,6 +157,9 @@ class SystemConfig(Config):
     if duplicates:
       raise ConfigError(f"GPIO pins used more than once: {duplicates}")
 
+    if not any(zone.system == HYDRONIC and zone.end_switches for zone in self.zones):
+      raise ConfigError("the boiler needs at least one hydronic zone with an end_switch")
+
   @property
   def end_switches(self) -> list[str]:
-    return [pin for zone in self.zones for pin in zone.end_switches]
+    return [pin for zone in self.zones if zone.system == HYDRONIC for pin in zone.end_switches]
