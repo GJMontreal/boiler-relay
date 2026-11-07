@@ -3,7 +3,7 @@
 ## Get `main.py` running
 
 - [ ] Add `paho-mqtt` and the package providing `unopt` to `requirements.txt`, or drop `unopt`.
-- [ ] Make `config.json` and `zones.json` match the `system_config.json` zone shape, or delete them.
+- [ ] Make `system_config.json` the `main.py` default and delete `config.json`.
 
 ## Outputs
 
@@ -15,25 +15,22 @@
 
 ## Cleanup
 
-- [ ] Delete `boiler_relay.py` and root `output_thread.py` once `main.py` has parity.
 - [ ] Remove the duplicate `PIDThread.write_row` or `Zone.write_row`.
 - [ ] Remove `HeatingCoolingState` from `src/output_thread.py`, use `src/heating_cooling_state.py`.
-- [ ] Delete `dump.rdb` and add it to `.gitignore`.
-- [ ] Drop the unused config files once the shape is settled: `zones.json`, `mqtt.json`, `redis.json`, `message.json`, `system_config.json` or `config.json`.
 - [ ] Move the log path out of code and into config.
 - [ ] Move PID gains into per-zone config.
 
 ## Deploy
 
 - [ ] Make `deploy.sh` copy `main.py` and the config.
-- [ ] Point `unit/boiler_relay.service` at `main.py` when parity lands.
+- [ ] Point `unit/boiler_relay.service.template` and the unit at `main.py`. They still run the deleted `boiler_relay.py`.
 - [ ] Take the install path from `setup_python.sh.template` instead of the hardcoded `/home/heating`.
 - [ ] Replace `rm -rf` of the install directory with a safer sync.
 - [ ] Remove generated `deploy/setup_python.sh` and `unit/boiler_relay.service` from git, keep the templates.
 
 ## Quality
 
-- [ ] Add tests for `Zone`, `BoilerThread`, `MQTTRelay` and `main.py` config loading.
+- [ ] Add tests for `MQTTRelay` and `main.py` config loading.
 - [ ] Replace `print` with `logging`.
 - [ ] Add a clean shutdown path for the threads and GPIO cleanup.
 - [ ] Update `.vscode/launch.json`, which still launches the `output_thread` module.

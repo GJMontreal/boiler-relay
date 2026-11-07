@@ -43,16 +43,16 @@ Every zone is identified by a sensor path such as `/home/sensors/0xFD69`.
 | `<sensor_path>/heating_cooling_state` | zone valve thread | 0 or 1 |
 
 ## Configuration
-Zones, the boiler output and the redis and MQTT endpoints are described in JSON. `config.json` is the format the deployed script reads today. `system_config.json` shows where the modular version is heading: each zone lists a set of typed outputs, which can be a local GPIO or an MQTT relay.
+Zones, the boiler output and the redis and MQTT endpoints are described in JSON. `system_config.json` is the format the modular version reads: each zone lists a set of typed outputs, which can be a local GPIO or an MQTT relay.
 
 ## Status
-The `more_better_modular` branch is the development branch. It is splitting the original scripts into the `src` package behind a new `main.py`. Until that work is finished, the deployed service still runs `boiler_relay.py`.
+The `more_better_modular` branch is the development branch. It replaced the original scripts with the `src` package behind a new `main.py`. The systemd unit and `deploy.sh` still point at the old `boiler_relay.py` and need updating.
 
 ## Running
 ```
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python main.py --config config.json
+python main.py --config system_config.json
 ```
 A local redis is required. Off the BeagleBone, `src/gpio.py` stands in for the real GPIO library and prints instead of switching pins.
 
