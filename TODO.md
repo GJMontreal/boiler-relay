@@ -38,7 +38,8 @@
 
 ## Quality
 
-- [ ] Add tests for the zone valve duty cycle and the PID wiring, using the stub GPIO and a fake redis.
+- [ ] Add tests for `Zone`, `BoilerThread`, `MQTTRelay` and `main.py` config loading.
+- [ ] Remove the `xfail` on the boost test once `zone_valve_thread` imports `json`.
 - [ ] Replace `print` with `logging`.
 - [ ] Add a clean shutdown path for the threads and GPIO cleanup.
 - [ ] Update `.vscode/launch.json`, which still launches the `output_thread` module.

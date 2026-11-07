@@ -49,13 +49,14 @@ The Homebridge plugin and the MQTT bridge share these keys. Do not rename them. 
 - One thread per concern, each with a `while True` loop and a `sleep(interval)`.
 - Outputs can be active low per zone. Invert at the last step before `GPIO.output`.
 - GPIO pin names are BeagleBone headers such as `P8_10`.
-- No test suite and no linter. Run `python main.py -c config.json` to smoke test with the stub GPIO. It needs a local redis.
+- Tests live in `tests/` and use pytest with fakeredis and a recording GPIO. Run `.venv/bin/python -m pytest`. Loop threads are stopped by a fake `sleep` that raises, see `run_ticks` in `tests/conftest.py`.
+- No linter. Run `python main.py -c config.json` to smoke test with the stub GPIO. It needs a local redis.
 
 ## Setup
 
 ```
 python3 -m venv .venv && . .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
-`Adafruit-BBIO` fails to install off the BeagleBone. Install the rest by hand when developing elsewhere.
+`Adafruit-BBIO` fails to install off the BeagleBone. `requirements-dev.txt` leaves it out for that reason.
