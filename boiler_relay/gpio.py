@@ -1,7 +1,11 @@
+import logging
+
+log = logging.getLogger(__name__)
+
 try:
   import Adafruit_BBIO.GPIO as GPIO
 except (ImportError, RuntimeError):
-  print('Adafruit_BBIO is not available, using stub GPIO')
+  log.warning('Adafruit_BBIO is not available, using stub GPIO')
 
   class GPIO():
     OUT = 1
@@ -12,15 +16,15 @@ except (ImportError, RuntimeError):
 
     @classmethod
     def setup(cls, pin, state):
-      print('gpio setup')
+      log.debug('gpio setup')
 
     @classmethod
     def cleanup(cls):
-      print('gpio cleanup')
+      log.debug('gpio cleanup')
 
     @classmethod
     def output(cls, pin, state):
-      print('gpio output')
+      log.debug('gpio output')
 
     @classmethod
     def input(cls, pin):

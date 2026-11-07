@@ -1,8 +1,8 @@
-import csv
-import os
+import logging
+from datetime import datetime, timezone
 from json import loads
-from threading import Thread
-from time import sleep
+from threading import Event, Thread
+from time import monotonic, sleep
 
 from redis import Redis
 from simple_pid import PID
@@ -10,11 +10,12 @@ from simple_pid import PID
 from boiler_relay.heating_cooling_state import HeatingCoolingState
 from boiler_relay.outputs import create_output
 
-LOG_PATH = "/tmp/ramdisk/boiler-relay"
+log = logging.getLogger(__name__)
 
-Kp = 1
-Ki = 0.01
-Kd = 0.5
+STALE_AFTER = 2 * 60 * 60
+FAILURE_LIMIT = 3
+REPORT_EVERY = 12
+TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 class Zone(Thread):
     def __init__(self, zone_config, redis_config, mqtt_config):
@@ -22,26 +23,32 @@ class Zone(Thread):
         self.input_path = zone_config.sensor_path
         self.output_path = zone_config.control_path
         self.redis = Redis(host=redis_config.host, port=redis_config.port, db=0)
-        self.pid = PID(Kp, Ki, Kd,
+
+        gains = zone_config.pid
+        self.pid = PID(gains.kp, gains.ki, gains.kd,
                        setpoint=0,
                        sample_time=zone_config.pid_interval,
                        output_limits=(0, 1))
 
         self.interval = 5
         self.cycle = 0
-        self.duration = 10 * 60 / self.interval
+        self.duration = zone_config.control_interval * 60 / self.interval
 
-        self.outputs = []
-        for output in zone_config.outputs:
-            output = {"active_low": zone_config.active_low, **output}
-            actuator = create_output(output, mqtt_config)
-            if actuator is not None:
-                self.outputs.append(actuator)
+        self.outputs = [create_output({**output, "active_low": zone_config.active_low}, mqtt_config)
+                        for output in zone_config.outputs]
 
         self.control_value = 0.0
         self.target_temperature = 0.0
         self.current_temperature = None
         self.last_sample_time = None
+        self.last_change_at = None
+        self.state = None
+        self.failures = 0
+        self.warned = set()
+        self.stopping = Event()
+        self.window_ticks = 0
+        self.window_on = 0
+        self.window_control = 0.0
 
     def start(self):
         for output in self.outputs:
@@ -49,9 +56,49 @@ class Zone(Thread):
         super().start()
 
     def run(self):
-        while True:
-            self.update()
+        while not self.stopping.is_set():
+            try:
+                self.update()
+                if self.failures:
+                    log.info("zone %s recovered after %d failed ticks", self.name, self.failures)
+                self.failures = 0
+            except Exception as error:
+                self.failures += 1
+                self.report_failure(error)
+                if self.failures >= FAILURE_LIMIT:
+                    self.deactivate_outputs()
             sleep(self.interval)
+
+    def shutdown(self):
+        self.stopping.set()
+        if self.is_alive():
+            self.join(timeout=self.interval * 2)
+        self.deactivate_outputs(wait=True)
+        for output in self.outputs:
+            output.stop()
+
+    def deactivate_outputs(self, wait=False):
+        for output in self.outputs:
+            try:
+                output.deactivate(wait=wait)
+            except Exception as error:
+                log.error("zone %s could not drive an output inactive: %s", self.name, error)
+
+    def report_failure(self, error):
+        if self.failures in (1, FAILURE_LIMIT) or self.failures % REPORT_EVERY == 0:
+            log.error("zone %s tick failed %d times in a row: %s", self.name, self.failures, error)
+
+    def warn(self, key, message):
+        if key in self.warned:
+            return False
+        self.warned.add(key)
+        log.warning("zone %s: %s", self.name, message)
+        return True
+
+    def clear(self, key):
+        if key in self.warned:
+            self.warned.discard(key)
+            log.info("zone %s: %s is back to normal", self.name, key)
 
     def update(self):
         self.read_sensors()
@@ -70,14 +117,8 @@ class Zone(Thread):
         self.redis.set(topic, state.value)
         self.redis.publish(topic, state.value)
 
-        print(f'zone {self.name} {self.control_value:.3f} {self.current_temperature} {self.target_temperature} {state}')
-
-        self.cycle += 1
-        if self.cycle > self.duration - 1:
-            self.cycle = 0
-
-        if self.last_sample_time is not None and os.path.isdir(LOG_PATH):
-            self.write_row()
+        self.record(state)
+        self.advance_cycle()
 
     def read_json(self, key):
         message = self.redis.get(key)
@@ -89,15 +130,37 @@ class Zone(Thread):
         data = self.read_json(f'{self.input_path}/current_temperature')
         if data is not None:
             self.current_temperature = float(data['value'])
-            self.last_sample_time = data['time']
+            if data['time'] != self.last_sample_time:
+                self.note_sample(data['time'])
 
         data = self.read_json(f'{self.input_path}/target_temperature')
         if data is not None:
             self.target_temperature = float(data['value'])
 
+    def note_sample(self, sample_time):
+        age = 0.0
+        if self.last_sample_time is None:
+            age = self.wall_clock_age(sample_time)
+        self.last_sample_time = sample_time
+        self.last_change_at = monotonic() - age
+
+    def wall_clock_age(self, sample_time):
+        try:
+            reported = datetime.strptime(sample_time, TIME_FORMAT).replace(tzinfo=timezone.utc)
+        except ValueError:
+            self.warn("sample time", f"cannot read the sample time {sample_time!r}, treating the reading as fresh")
+            return 0.0
+        return max(0.0, (datetime.now(timezone.utc) - reported).total_seconds())
+
     def compute_control_value(self):
         if self.current_temperature is None:
+            self.warn("sensor", "no temperature reading yet, calling for no heat")
             return 0.0
+        if monotonic() - self.last_change_at > STALE_AFTER:
+            if self.warn("sensor", f"temperature reading is stale since {self.last_sample_time}, calling for no heat"):
+                self.pid.reset()
+            return 0.0
+        self.clear("sensor")
         self.pid.setpoint = self.target_temperature
         return self.pid(self.current_temperature)
 
@@ -105,12 +168,22 @@ class Zone(Thread):
         message = self.redis.get(f'{self.input_path}/target_heatingcooling_state')
         if message is None:
             return None
-        return HeatingCoolingState(int(message.decode('utf-8')))
+        try:
+            value = int(message.decode('utf-8'))
+        except ValueError:
+            value = None
+
+        if value in (HeatingCoolingState.OFF.value, HeatingCoolingState.HEAT.value):
+            self.clear("target state")
+            return HeatingCoolingState(value)
+
+        self.warn("target state", f"unsupported target state {message!r}, treating it as off")
+        return HeatingCoolingState.OFF
 
     def duty_state(self, target_state):
         state = HeatingCoolingState.OFF
         on_time = int(self.control_value * self.duration)
-        if target_state != HeatingCoolingState.OFF and on_time > self.cycle:
+        if target_state == HeatingCoolingState.HEAT and on_time > self.cycle:
             state = HeatingCoolingState.HEAT
 
         boost = self.read_json(f'{self.input_path}/boost')
@@ -118,30 +191,27 @@ class Zone(Thread):
             state = HeatingCoolingState.HEAT
         return state
 
-    def write_row(self):
-        p, i, d = self.pid.components
+    def record(self, state):
+        if state != self.state:
+            log.info("zone %s %s -> %s", self.name, self.state, state)
+            self.state = state
+        log.debug("zone %s control %.3f current %s target %s %s",
+                  self.name, self.control_value, self.current_temperature, self.target_temperature, state)
 
-        current_temperature = '{:.1f}'.format(self.current_temperature)
-        target_temperature = '{:.1f}'.format(self.target_temperature)
-        control_value = '{:.0f}'.format(self.control_value * self.duration)
+        self.window_ticks += 1
+        self.window_control += self.control_value
+        if state == HeatingCoolingState.HEAT:
+            self.window_on += 1
 
-        p_formatted = '{:.6f}'.format(p)
-        i_formatted = '{:.6f}'.format(i)
-        d_formatted = '{:.6f}'.format(d)
-
-        row = ([ self.last_sample_time,
-                current_temperature,
-                target_temperature,
-                control_value,
-                p_formatted,
-                i_formatted,
-                d_formatted])
-
-        self.write_row_to_csv(row)
-
-    def write_row_to_csv(self,row):
-        file_name = os.path.split(self.name)[-1]
-        file_path = f'{LOG_PATH}/{file_name}_pid.csv'
-        with open(file_path,'a', newline='') as csvfile:
-            writer = csv.writer(csvfile, delimiter=',',quoting=csv.QUOTE_NONE)
-            writer.writerow(row)
+    def advance_cycle(self):
+        self.cycle += 1
+        if self.cycle > self.duration - 1:
+            self.cycle = 0
+            log.info("zone %s window control_mean=%.3f on_fraction=%.3f ticks=%d",
+                     self.name,
+                     self.window_control / self.window_ticks,
+                     self.window_on / self.window_ticks,
+                     self.window_ticks)
+            self.window_ticks = 0
+            self.window_on = 0
+            self.window_control = 0.0

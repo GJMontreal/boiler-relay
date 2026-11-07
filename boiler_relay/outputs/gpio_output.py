@@ -1,6 +1,10 @@
+import logging
+
 from boiler_relay.config import MQTTConfig
 from boiler_relay.gpio import GPIO
 from boiler_relay.outputs.actuator import Actuator
+
+log = logging.getLogger(__name__)
 
 class GPIOOutput(Actuator):
   output_type = "gpio"
@@ -12,7 +16,7 @@ class GPIOOutput(Actuator):
     self.config_gpio()
 
   def config_gpio(self):
-    print(f'configuring GPIO: {self.pin} as Output')
+    log.info("configuring GPIO %s as output", self.pin)
     GPIO.setup(self.pin, GPIO.OUT)
     output = GPIO.LOW
     if self.active_low:

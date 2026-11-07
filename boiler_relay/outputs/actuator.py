@@ -1,4 +1,8 @@
+import logging
+
 from boiler_relay.config import MQTTConfig
+
+log = logging.getLogger(__name__)
 
 class Actuator():
   output_type = None
@@ -13,7 +17,9 @@ class Actuator():
   def stop(self):
     pass
 
+  def deactivate(self, wait=False):
+    self.activate(0)
+
   # it's up to concrete implementations to do something useful here
   def activate(self, value):
-    print(f"{self.output_config}.value = {value}")
-
+    log.debug("%s.value = %s", self.output_config, value)

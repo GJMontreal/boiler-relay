@@ -1,71 +1,65 @@
-from __future__ import annotations
-from argparse import ArgumentParser, Namespace
+import logging
+import signal
+import sys
+from argparse import ArgumentParser
+from pathlib import Path
+from threading import Event
+
 from boiler_relay.boiler_thread import BoilerThread
-from boiler_relay.config import BoilerConfig, MQTTConfig, RedisConfig, ZoneConfig
+from boiler_relay.config import ConfigError, SystemConfig
 from boiler_relay.zone import Zone
 
-from json import load
-from pathlib import Path
-from unopt import *
-from pprint import pprint
+log = logging.getLogger("boiler_relay")
 
 DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "config" / "system_config.json"
 
-def read_config(config_path) -> Namespace | None:
-  try:
-     file = open(config_path, 'r')
-  except FileNotFoundError:
-     print(f"{config_path} doesn't exist")
-  else:
-    with file:
-      data = load(file)
-      return Namespace(**data)
-
-def parse_arguments() -> Namespace:
+def parse_arguments(argv=None):
   parser = ArgumentParser(description='Get config file path')
   parser.add_argument('--config', '-c', help = 'config file', default=str(DEFAULT_CONFIG))
-  args = parser.parse_args()
-  return args
+  return parser.parse_args(argv)
 
-def create_zone(zone_config, redis_config, mqtt_config):
+def build(system):
+  zones = [Zone(zone, system.redis, system.mqtt) for zone in system.zones]
+  boiler = BoilerThread(system.boiler, system.end_switches)
+  return zones, boiler
+
+def supervise(threads, stop, poll=1.0):
+  while not stop.is_set():
+    dead = [thread.name for thread in threads if not thread.is_alive()]
+    if dead:
+      log.error("thread stopped: %s", ", ".join(dead))
+      return 1
+    stop.wait(poll)
+  return 0
+
+def shutdown(zones, boiler):
+  boiler.shutdown()
+  for zone in zones:
+    zone.shutdown()
+
+def main(argv=None):
+  logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+  args = parse_arguments(argv)
 
   try:
-    zone = Zone(ZoneConfig(**zone_config),redis_config,mqtt_config)
-    return zone
-  except Exception as error:
-    print(f"Failed to create zone. {error}")
-    pprint(zone_config)
+    system = SystemConfig.from_file(args.config)
+    zones, boiler = build(system)
+  except (ConfigError, ValueError, KeyError) as error:
+    log.error("invalid configuration: %s", error)
+    return 2
 
+  stop = Event()
+  signal.signal(signal.SIGTERM, lambda *_: stop.set())
+  signal.signal(signal.SIGINT, lambda *_: stop.set())
+
+  for zone in zones:
+    zone.start()
+  boiler.start()
+  log.info("started %d zones and the boiler", len(zones))
+
+  code = supervise(zones + [boiler], stop)
+  shutdown(zones, boiler)
+  return code
 
 if __name__ == "__main__":
-  args = parse_arguments()
-  try:
-    config = unwrap(read_config(args.config))
-  except:
-    print("Missing configuration! Exiting")
-    exit()
-
-  try:
-    mqtt_config = MQTTConfig(**config.mqtt)
-  except:
-    print("Missing MQTT configuation")
-    mqtt_config = None
-
-  try:
-    redis_config = RedisConfig(**config.redis)
-  except:
-    print("Missing Redis configuration! Exiting")
-    exit()
-
-  try:
-    boiler_config = BoilerConfig(**config.boiler)
-  except:
-    print("Missing boiler configuration")
-    boiler_config = None
-
-  zones = [create_zone(zone, redis_config, mqtt_config) for zone in config.zones]
-  [zone.start() for zone in zones if zone is not None]
-  if boiler_config is not None:
-    BoilerThread(boiler_config, getattr(config, "inputs", [])).start()
-  print(f"MQTT {mqtt_config}")
-  print(f"Redis {redis_config}")
+  sys.exit(main())

@@ -1,84 +1,77 @@
 {
     "mqtt": {
-        "host": "esplanade.local",
+        "host": "localhost",
         "port": 1883,
         "keep_alive": 60
     },
-    "redis":{
-      "host": "localhost",
-      "port":6379
+    "redis": {
+        "host": "localhost",
+        "port": 6379
     },
     "zones": [
-    {
-        "sensor_path": "/home/sensors/0xFD69",
-        "outputs": [
-            {
-                "type": "gpio",
-                "pin": "P8_10"
-            },
-            {
-                "type": "gpio",
-                "pin": "P8_14"
-            }
-        ],
-        "name": "Bedrooms",
-        "pid_interval": "10",
-        "control_interval": "10",
-        "active_low": true
-    },
-    {
-        "sensor_path": "/home/sensors/0x53FE",
-        "outputs": [
-            {
-                "type": "gpio",
-                "pin": "P8_8"
-            },
-            {
-                "type": "MQTTRelay",
-                "topic": "cmnd/tasmota_E3738F/ZbSend",
-                "device": "0xB5EA"
-            }
-        ],
-        "name": "Common",
-        "pid_interval": "10",
-        "control_interval": "10",
-        "active_low": true
-    },
-    {
-        "sensor_path": "/home/sensors/0xE1AC",
-        "outputs": [
-            {
-                "type": "gpio",
-                "pin": "P8_12"
-            }
-        ],
-        "name": "Study",
-        "pid_interval": "10",
-        "control_interval": "10",
-        "active_low": true
-    },
-    {
-        "sensor_path": "/home/sensors/0xA1DA",
-        "outputs": [
-            {
-                "type": "gpio",
-                "pin": "P8_16"
-            }
-        ],
-        "name": "Kitchen",
-        "pid_interval": "10",
-        "control_interval": "10",
-        "active_low": true
-    }],
+        {
+            "sensor_path": "/home/sensors/bedroom",
+            "name": "Bedrooms",
+            "outputs": [
+                {"type": "gpio", "pin": "P8_10", "end_switch": "P8_9"},
+                {"type": "gpio", "pin": "P8_14", "end_switch": "P8_17"}
+            ],
+            "pid_interval": 10,
+            "control_interval": 10,
+            "active_low": true
+        },
+        {
+            "sensor_path": "/home/sensors/living_room",
+            "name": "Common",
+            "outputs": [
+                {"type": "gpio", "pin": "P8_8", "end_switch": "P8_7"}
+            ],
+            "pid_interval": 10,
+            "control_interval": 10,
+            "active_low": true
+        },
+        {
+            "sensor_path": "/home/sensors/front_room",
+            "name": "Study",
+            "outputs": [
+                {"type": "gpio", "pin": "P8_12", "end_switch": "P8_11"}
+            ],
+            "pid_interval": 10,
+            "control_interval": 10,
+            "active_low": true
+        },
+        {
+            "sensor_path": "/home/sensors/kitchen",
+            "name": "Kitchen",
+            "outputs": [
+                {"type": "gpio", "pin": "P8_16", "end_switch": "P8_15"}
+            ],
+            "pid_interval": 10,
+            "control_interval": 10,
+            "active_low": true
+        },
+        {
+            "sensor_path": "/home/sensors/back_room",
+            "name": "BackRoom",
+            "outputs": [
+                {"type": "gpio", "pin": "P8_28", "end_switch": "P8_27"}
+            ],
+            "pid_interval": 10,
+            "control_interval": 10,
+            "active_low": true
+        },
+        {
+            "sensor_path": "/home/sensors/stairwell",
+            "name": "Stairwell",
+            "outputs": [
+                {"type": "MQTTRelay", "topic": "cmnd/tasmota_E3738F/ZbSend", "device": "0xB5EA"}
+            ],
+            "pid_interval": 10,
+            "control_interval": 10
+        }
+    ],
     "boiler": {
         "output_gpio": "P8_18",
-        "control_interval": "10"
-    },
-    "inputs": [
-        "P8_7",
-        "P8_9",
-        "P8_11",
-        "P8_15",
-        "P8_17"
-    ]
+        "poll_interval": 5
+    }
 }

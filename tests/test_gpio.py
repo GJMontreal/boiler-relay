@@ -1,3 +1,4 @@
+import logging
 import sys
 from importlib import reload
 from types import ModuleType
@@ -27,13 +28,14 @@ def test_uses_adafruit_bbio_when_installed(monkeypatch):
     reload(gpio)
 
 
-def test_falls_back_to_the_stub_when_not_installed(monkeypatch, capsys):
+def test_falls_back_to_the_stub_when_not_installed(monkeypatch, caplog):
   try:
-    stub = load_gpio(monkeypatch, None)
+    with caplog.at_level(logging.WARNING, logger="boiler_relay.gpio"):
+      stub = load_gpio(monkeypatch, None)
 
     assert stub.__name__ == "GPIO"
     assert not isinstance(stub, ModuleType)
-    assert "using stub GPIO" in capsys.readouterr().out
+    assert "using stub GPIO" in caplog.text
   finally:
     reload(gpio)
 
