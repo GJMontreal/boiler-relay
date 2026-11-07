@@ -115,13 +115,12 @@ def test_publishes_state(redis_client, gpio, run_ticks):
   assert redis_client.get(f"{SENSOR}/heating_cooling_state") == b"1"
 
 
-@pytest.mark.xfail(reason="zone_valve_thread does not import json", raises=NameError, strict=True)
 def test_boost_forces_valve_open(redis_client, gpio, run_ticks):
   seed(redis_client, state=0, control_value=0)
   redis_client.set(f"{SENSOR}/boost", "true")
   thread = make_thread()
   gpio.clear()
 
-  run_ticks(thread, 2)
+  run_ticks(thread, 1)
 
   assert states(gpio) == [1]

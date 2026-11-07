@@ -1,3 +1,4 @@
+from json import loads
 from threading import Thread
 from time import sleep
 from redis import Redis
@@ -62,7 +63,7 @@ class ZoneValveThread(Thread):
             topic = f'{self.sensor_path}/boost'
             message = self.r.get(topic)
             if message is not None:
-                bool_value = json.loads(message)
+                bool_value = loads(message)
                 if bool_value == True:
                     heating_cooling_state = HeatingCoolingState.HEAT
 

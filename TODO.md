@@ -4,7 +4,6 @@
 
 - [ ] Add `paho-mqtt` and the package providing `unopt` to `requirements.txt`, or drop `unopt`.
 - [ ] Settle one zone config shape and make `ZoneConfig` in `src/config.py` match it.
-- [ ] Import `json` in `src/zone_valve_thread.py`.
 - [ ] Create a `ZoneValveThread` in `Zone` and start it.
 - [ ] Fix `Zone.write_row`: define `os`, `LOG_PATH` and the valve thread it uses.
 - [ ] Port `BoilerThread` into the new startup path.
@@ -39,7 +38,6 @@
 ## Quality
 
 - [ ] Add tests for `Zone`, `BoilerThread`, `MQTTRelay` and `main.py` config loading.
-- [ ] Remove the `xfail` on the boost test once `zone_valve_thread` imports `json`.
 - [ ] Replace `print` with `logging`.
 - [ ] Add a clean shutdown path for the threads and GPIO cleanup.
 - [ ] Update `.vscode/launch.json`, which still launches the `output_thread` module.
