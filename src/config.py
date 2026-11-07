@@ -31,11 +31,20 @@ class OutputConfig(Config):
 
 @dataclass
 class ZoneConfig(Config):
-  input_path: str
-  output_path: str
+  sensor_path: str
   name: str
+  outputs: list[dict]
   pid_interval: float
   control_interval: float
+  active_low: bool = False
+
+  def __post_init__(self):
+    self.pid_interval = float(self.pid_interval)
+    self.control_interval = float(self.control_interval)
+
+  @property
+  def control_path(self) -> str:
+    return f"{self.sensor_path}/control_value"
 
 @dataclass
 class RelayConfig(Config):

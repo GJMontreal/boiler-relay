@@ -3,10 +3,10 @@ from src.output_thread import PIDThread
 class Zone():
     def __init__(self, zone_config, redis_config):
         self.name = zone_config.name
-        self.input_path = zone_config.input_path
-        self.output_path = zone_config.output_path
-        self.pid_thread = ( PIDThread(zone_config.input_path,
-                                      zone_config.output_path,
+        self.input_path = zone_config.sensor_path
+        self.output_path = zone_config.control_path
+        self.pid_thread = ( PIDThread(self.input_path,
+                                      self.output_path,
                                     zone_config.pid_interval,
                                     self)) #not super keen about passing in self
 
