@@ -3,10 +3,10 @@ from threading import Thread
 
 import pytest
 
-from src import zone as zone_module
-from src.actuator import GPIOOutput, MQTTRelay
-from src.config import MQTTConfig, RedisConfig, ZoneConfig
-from src.zone import Zone
+from boiler_relay import zone as zone_module
+from boiler_relay.config import MQTTConfig, RedisConfig, ZoneConfig
+from boiler_relay.outputs import GPIOOutput, MQTTRelay
+from boiler_relay.zone import Zone
 
 SENSOR = "/home/sensors/a"
 STATE = f"{SENSOR}/heating_cooling_state"

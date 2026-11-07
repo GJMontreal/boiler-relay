@@ -1,7 +1,7 @@
 from threading import Thread
 from time import sleep
 
-from src.gpio import GPIO
+from boiler_relay.gpio import GPIO
 
 
 class BoilerThread(Thread):

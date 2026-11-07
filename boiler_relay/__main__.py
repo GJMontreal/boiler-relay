@@ -1,12 +1,15 @@
 from __future__ import annotations
 from argparse import ArgumentParser, Namespace
-from src.boiler_thread import BoilerThread
-from src.config import BoilerConfig, MQTTConfig, RedisConfig, ZoneConfig
-from src.zone import Zone
+from boiler_relay.boiler_thread import BoilerThread
+from boiler_relay.config import BoilerConfig, MQTTConfig, RedisConfig, ZoneConfig
+from boiler_relay.zone import Zone
 
 from json import load
+from pathlib import Path
 from unopt import *
 from pprint import pprint
+
+DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "config" / "system_config.json"
 
 def read_config(config_path) -> Namespace | None:
   try:
@@ -20,7 +23,7 @@ def read_config(config_path) -> Namespace | None:
 
 def parse_arguments() -> Namespace:
   parser = ArgumentParser(description='Get config file path')
-  parser.add_argument('--config', '-c', help = 'config file', default='config.json')
+  parser.add_argument('--config', '-c', help = 'config file', default=str(DEFAULT_CONFIG))
   args = parser.parse_args()
   return args
 

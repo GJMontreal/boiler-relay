@@ -6,9 +6,10 @@ After=redis.service
 Type=simple
 User=<user_name>
 WorkingDirectory=/var/lib/<project_name>
-ExecStart=/home/<user_name>/<project_name>/.venv/bin/python /home/<user_name>/<project_name>/boiler_relay.py
+ExecStart=/home/<user_name>/<project_name>/.venv/bin/python -m boiler_relay
 Restart=on-failure
 Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/home/<user_name>/<project_name>
 
 [Install]
 WantedBy=multi-user.target

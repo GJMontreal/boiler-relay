@@ -18,7 +18,7 @@ INSTALL_DIR="/home/${REMOTE_USER}/${PROJECT_NAME}"
 #we don't use the -i option to keep it working across platforms
 TEMPLATES=(\
           "deploy/setup_python.sh.template"
-          "unit/boiler_relay.service.template"
+          "deploy/boiler_relay.service.template"
           )
 
 echo "Creating files from templates"
@@ -37,12 +37,16 @@ echo $WORKING_DIR
 FILES_TO_COPY=(\
                 "requirements.txt" \
                 "deploy/setup_python.sh" \
-                "src/*.py" 
+                "deploy/boiler_relay.service" \
+                "config/system_config.json" \
+                "boiler_relay/*.py" \
+                "boiler_relay/outputs/*.py"
                 )
 
 REMOTE_DIRS=(\
-            "src"\
-            "unit"\
+            "boiler_relay"\
+            "boiler_relay/outputs"\
+            "config"\
             "deploy"
             )
 
@@ -68,6 +72,4 @@ ${SSH_CMD} "${INSTALL_DIR}/deploy/setup_python.sh"
 
 echo installing services
 
-# ${SSH_CMD} sudo cp "${INSTALL_DIR}/unit/* /etc/systemd/system"
-# ${SSH_CMD} sudo rm -rf "${INSTALL_DIR}/unit"
- h
+# ${SSH_CMD} sudo cp "${INSTALL_DIR}/deploy/boiler_relay.service" /etc/systemd/system

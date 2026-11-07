@@ -1,8 +1,9 @@
 import fakeredis
 import pytest
 
-from src import actuator, boiler_thread
-from src import zone as zone_module
+from boiler_relay import boiler_thread
+from boiler_relay import zone as zone_module
+from boiler_relay.outputs import gpio_output
 
 
 class StopLoop(Exception):
@@ -81,6 +82,6 @@ def gpio(monkeypatch, gpio_inputs):
     def input(cls, pin):
       return gpio_inputs.get(pin, 0)
 
-  monkeypatch.setattr(actuator, "GPIO", RecordingGPIO)
+  monkeypatch.setattr(gpio_output, "GPIO", RecordingGPIO)
   monkeypatch.setattr(boiler_thread, "GPIO", RecordingGPIO)
   return calls

@@ -2,7 +2,7 @@ import sys
 from importlib import reload
 from types import ModuleType
 
-from src import gpio
+from boiler_relay import gpio
 
 
 def load_gpio(monkeypatch, bbio):

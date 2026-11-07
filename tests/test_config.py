@@ -1,8 +1,11 @@
 from json import dumps, load as json_load
+from pathlib import Path
 
 import pytest
 
-from src.config import BoilerConfig, MQTTConfig, RedisConfig, ZoneConfig
+from boiler_relay.config import BoilerConfig, MQTTConfig, RedisConfig, ZoneConfig
+
+CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "system_config.json"
 
 
 def test_from_file_builds_dataclass(tmp_path):
@@ -83,10 +86,10 @@ def test_zone_config_rejects_legacy_gpio_keys():
 
 
 def test_every_zone_in_system_config_loads():
-  with open("system_config.json") as file:
+  with open(CONFIG_PATH) as file:
     zones = json_load(file)["zones"]
 
-  assert [ZoneConfig(**zone).name for zone in zones] == ["Bedrooms", "Common"]
+  assert [ZoneConfig(**zone).name for zone in zones] == ["Bedrooms", "Common", "Study", "Kitchen"]
 
 
 def test_boiler_config_defaults_to_active_low():

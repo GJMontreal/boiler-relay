@@ -1,49 +1,8 @@
-from src.config import MQTTConfig, RelayConfig
-from src.gpio import GPIO
+from boiler_relay.config import MQTTConfig, RelayConfig
+from boiler_relay.outputs.actuator import Actuator
 from json import dumps
 from threading import Event, Lock, Thread
 from paho.mqtt import client as mqtt_client
-
-class Actuator():
-  output_type = None
-
-  def __init__(self, output_config: dict, mqtt_config: MQTTConfig = None) -> None:
-    self.output_config = output_config
-    self.mqtt_config = mqtt_config
-
-  def start(self):
-    pass
-
-  def stop(self):
-    pass
-
-  # it's up to concrete implementations to do something useful here
-  def activate(self, value):
-    print(f"{self.output_config}.value = {value}")
-
-class GPIOOutput(Actuator):
-  output_type = "gpio"
-
-  def __init__(self, output_config: dict, mqtt_config: MQTTConfig = None) -> None:
-    super().__init__(output_config, mqtt_config)
-    self.pin = output_config["pin"]
-    self.active_low = output_config.get("active_low", False)
-    self.config_gpio()
-
-  def config_gpio(self):
-    print(f'configuring GPIO: {self.pin} as Output')
-    GPIO.setup(self.pin, GPIO.OUT)
-    output = GPIO.LOW
-    if self.active_low:
-      output = GPIO.HIGH
-    GPIO.output(self.pin, output)
-    GPIO.cleanup()
-
-  def activate(self, value):
-    output = 1 if value else 0
-    if self.active_low:
-      output = output * -1 + 1
-    GPIO.output(self.pin, output)
 
 # {"Device":"0xB5EA","Send":{"Power":0}}
 class MQTTRelay(Actuator):
@@ -98,16 +57,3 @@ class MQTTRelay(Actuator):
       self.client.publish(self.relay_config.topic, dumps(message))
     except Exception as error:
       print(f"MQTT send failed for {self.relay_config.device}: {error}")
-
-def create_output(output_config, mqtt_config):
-  if "type" not in output_config:
-    print("missing output type")
-    return
-
-  type_name = output_config["type"]
-  output_types = {cls.output_type: cls for cls in Actuator.__subclasses__() if cls.output_type}
-  if type_name not in output_types:
-    print(f"Unsupported output type: {type_name}")
-    return
-
-  return output_types[type_name](output_config, mqtt_config)

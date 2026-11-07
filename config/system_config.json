@@ -43,6 +43,32 @@
         "pid_interval": "10",
         "control_interval": "10",
         "active_low": true
+    },
+    {
+        "sensor_path": "/home/sensors/0xE1AC",
+        "outputs": [
+            {
+                "type": "gpio",
+                "pin": "P8_12"
+            }
+        ],
+        "name": "Study",
+        "pid_interval": "10",
+        "control_interval": "10",
+        "active_low": true
+    },
+    {
+        "sensor_path": "/home/sensors/0xA1DA",
+        "outputs": [
+            {
+                "type": "gpio",
+                "pin": "P8_16"
+            }
+        ],
+        "name": "Kitchen",
+        "pid_interval": "10",
+        "control_interval": "10",
+        "active_low": true
     }],
     "boiler": {
         "output_gpio": "P8_18",

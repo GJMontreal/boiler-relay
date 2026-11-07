@@ -7,8 +7,8 @@ from time import sleep
 from redis import Redis
 from simple_pid import PID
 
-from src.actuator import create_output
-from src.heating_cooling_state import HeatingCoolingState
+from boiler_relay.heating_cooling_state import HeatingCoolingState
+from boiler_relay.outputs import create_output
 
 LOG_PATH = "/tmp/ramdisk/boiler-relay"
 

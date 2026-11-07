@@ -5,9 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from src import actuator
-from src.actuator import GPIOOutput, MQTTRelay, create_output
-from src.config import MQTTConfig
+from boiler_relay.config import MQTTConfig
+from boiler_relay.outputs import GPIOOutput, MQTTRelay, create_output, mqtt_relay
 
 MQTT = MQTTConfig(host="broker.local", port=1883, keep_alive=60)
 RELAY = {"type": "MQTTRelay", "topic": "cmnd/x/ZbSend", "device": "0xB5EA"}
@@ -48,7 +47,7 @@ def mqtt_clients(monkeypatch):
         FakeClient.gate.wait(2)
       self.published.append((topic, payload))
 
-  monkeypatch.setattr(actuator, "mqtt_client", SimpleNamespace(
+  monkeypatch.setattr(mqtt_relay, "mqtt_client", SimpleNamespace(
     Client=FakeClient,
     CallbackAPIVersion=SimpleNamespace(VERSION2="v2"),
   ))

@@ -4,22 +4,22 @@ The philosophy guiding this project and its documentation is straightforward: ge
 
 Overall the heating system is quite simple. A boiler is connected via a manifold with zone valves to a series of radiators. When a zone calls for heat, first the zone valve opens, and when that is complete, the boiler and pump are then turned on.
 
-![plumbing overview](./img/plumbing_overview.jpeg)
+![plumbing overview](./docs/img/plumbing_overview.jpeg)
 Manifold with zone valves
-![manifold](./img/manifold.jpeg)
+![manifold](./docs/img/manifold.jpeg)
 
 # Electronics
 A beaglebone SBC running debian hosts all the software pieces as well as interfacing via GPIO to a relay board. The relays control the zone valves as well as the boiler
 
-![electronics overview](./img/electronics_overview.jpeg)
+![electronics overview](./docs/img/electronics_overview.jpeg)
 Beaglebone and relay board
-![electronics](img/electronics.jpeg)
+![electronics](docs/img/electronics.jpeg)
 # Software
 This project contains the logic for zone and boiler control. Sensor data is sent to an MQTT broker (mosquitto in this case). A simple bridge written in python publishes these values to redis. The homebridge plugin reads and writes respective values to redis. This project reads those values and toggles the physical gpios.
 The bits circled in red are the ones I've written. The UI is implemented as a [Homebridge plugin](https://github.com/GJMontreal/heating) 
 
-![software overview](img/software_overview.jpeg)
-![software](img/ui.jpeg)
+![software overview](docs/img/software_overview.jpeg)
+![software](docs/img/ui.jpeg)
 
 ## How a zone works
 Each zone has a temperature sensor, a setpoint and one or more outputs. One thread per zone does the work.
@@ -44,19 +44,19 @@ Every zone is identified by a sensor path such as `/home/sensors/0xFD69`.
 | `<sensor_path>/heating_cooling_state` | zone | 0 or 1 |
 
 ## Configuration
-Zones, the boiler output and the redis and MQTT endpoints are described in JSON. `system_config.json` is the format the modular version reads: each zone lists a set of typed outputs, which can be a local GPIO or an MQTT relay.
+Zones, the boiler output and the redis and MQTT endpoints are described in JSON. `config/system_config.json` is the default config file: each zone lists a set of typed outputs, which can be a local GPIO or an MQTT relay.
 
 ## Status
-The `more_better_modular` branch is the development branch. It replaced the original scripts with the `src` package behind a new `main.py`. The systemd unit and `deploy.sh` still point at the old `boiler_relay.py` and need updating.
+The `more_better_modular` branch is the development branch. It replaced the original scripts with the `boiler_relay` package. `deploy.sh` and the systemd unit have been updated for it and still need a trial run on the device.
 
 ## Running
 ```
 python3 -m venv .venv && . .venv/bin/activate
 pip install -r requirements.txt
-python main.py --config system_config.json
+python -m boiler_relay
 ```
-A local redis is required. `src/gpio.py` uses `Adafruit_BBIO` when it is installed. Without it, a stub prints instead of switching pins and logs a warning at startup.
+A local redis is required. `boiler_relay/gpio.py` uses `Adafruit_BBIO` when it is installed. Without it, a stub prints instead of switching pins and logs a warning at startup.
 
 ## Deploying
-`./deploy.sh <user> <host>` fills in the unit and setup templates, copies the files over ssh and builds a virtualenv on the device. It deletes the existing install directory first.
+`./deploy.sh <user> <host>` fills in the unit and setup templates from `deploy/`, copies the package and config over ssh and builds a virtualenv on the device. It deletes the existing install directory first.
 

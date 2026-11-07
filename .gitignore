@@ -129,3 +129,5 @@ dmypy.json
 .pyre/
 
 dump.rdb
+deploy/setup_python.sh
+deploy/boiler_relay.service

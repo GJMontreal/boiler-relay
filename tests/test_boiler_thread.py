@@ -1,5 +1,5 @@
-from src.boiler_thread import BoilerThread
-from src.config import BoilerConfig
+from boiler_relay.boiler_thread import BoilerThread
+from boiler_relay.config import BoilerConfig
 
 INPUTS = ["P8_7", "P8_9", "P8_11"]
 
