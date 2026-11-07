@@ -26,6 +26,7 @@ class Zone(Thread):
         self.redis = Redis(host=redis_config.host, port=redis_config.port, db=0)
         self.shadow = mode == SHADOW
         self.publisher = StatePublisher(self.redis, mode)
+        self.system = zone_config.system
         self.has_end_switch = bool(zone_config.end_switches)
 
         gains = zone_config.pid
@@ -114,7 +115,7 @@ class Zone(Thread):
 
         target_state = self.read_target_state()
         if target_state is None:
-            self.publisher.zone(self.name, self.control_value, None)
+            self.publisher.zone(self.name, self.system, self.control_value, None)
             return
 
         state = self.duty_state(target_state)
@@ -125,7 +126,7 @@ class Zone(Thread):
             topic = f'{self.input_path}/heating_cooling_state'
             self.redis.set(topic, state.value)
             self.redis.publish(topic, state.value)
-        self.publisher.zone(self.name, self.control_value, state.value)
+        self.publisher.zone(self.name, self.system, self.control_value, state.value)
 
         self.record(state)
         self.advance_cycle()

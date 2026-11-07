@@ -9,13 +9,13 @@ TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 class StatePublisher:
     def __init__(self, redis, mode):
         self.redis = redis
-        self.prefix = f"boiler_relay/{mode}"
+        self.prefix = f"heating/{mode}"
 
-    def zone(self, name, control_value, state):
-        self.write(f"zones/{name}", {"control_value": control_value, "state": state})
+    def zone(self, name, system, control_value, state):
+        self.write(f"zones/{name}", {"system": system, "control_value": control_value, "state": state})
 
     def boiler(self, call):
-        self.write("boiler", {"call": call})
+        self.write("hydronic/boiler", {"call": call})
 
     def heartbeat(self):
         self.write("heartbeat", {})

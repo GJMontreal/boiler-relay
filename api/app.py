@@ -91,8 +91,8 @@ def create_app(system, redis, unit_state=unit_state):
             control_value=None if control is None else float(control),
             heating_cooling_state=read_int(f"{path}/heating_cooling_state"),
             boost=read_json(f"{path}/boost"),
-            active=read_json(f"boiler_relay/{ACTIVE}/zones/{zone.name}"),
-            shadow=read_json(f"boiler_relay/{SHADOW}/zones/{zone.name}"),
+            active=read_json(f"heating/{ACTIVE}/zones/{zone.name}"),
+            shadow=read_json(f"heating/{SHADOW}/zones/{zone.name}"),
         )
 
     @app.get("/api/live", response_model=List[ZoneLive])

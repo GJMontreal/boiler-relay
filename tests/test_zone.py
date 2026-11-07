@@ -564,10 +564,11 @@ def test_a_shadow_zone_writes_only_under_the_shadow_prefix(redis_client, gpio, r
   run_ticks(zone, 3)
 
   written = set(redis_client.keys()) - before
-  assert written == {b"boiler_relay/shadow/zones/Bedrooms"}
+  assert written == {b"heating/shadow/zones/Bedrooms"}
   assert gpio == []
-  data = json.loads(redis_client.get("boiler_relay/shadow/zones/Bedrooms"))
+  data = json.loads(redis_client.get("heating/shadow/zones/Bedrooms"))
   assert data["state"] == 1
+  assert data["system"] == "hydronic"
   assert data["control_value"] == 1.0
 
 
@@ -587,7 +588,7 @@ def test_a_shadow_zone_publishes_a_null_state_before_the_target_state_exists(red
 
   run_ticks(make_shadow_zone(1.0), 1)
 
-  data = json.loads(redis_client.get("boiler_relay/shadow/zones/Bedrooms"))
+  data = json.loads(redis_client.get("heating/shadow/zones/Bedrooms"))
   assert data["state"] is None
 
 
@@ -597,7 +598,7 @@ def test_an_active_zone_also_publishes_under_the_active_prefix(redis_client, gpi
 
   run_ticks(zone, 2)
 
-  data = json.loads(redis_client.get("boiler_relay/active/zones/Bedrooms"))
+  data = json.loads(redis_client.get("heating/active/zones/Bedrooms"))
   assert data["state"] == 1
   assert redis_client.get(STATE) is not None
 
@@ -605,3 +606,16 @@ def test_an_active_zone_also_publishes_under_the_active_prefix(redis_client, gpi
 def test_a_zone_knows_whether_it_has_an_end_switch(redis_client, gpio):
   assert make_shadow_zone(0.0, [{**VALVE, "end_switch": "P8_9"}]).has_end_switch
   assert not make_shadow_zone(0.0, [VALVE]).has_end_switch
+
+
+def test_an_electric_zone_publishes_its_system(redis_client, gpio, run_ticks):
+  seed(redis_client, current=18, target=21, state=1)
+  config = ZoneConfig(sensor_path=SENSOR, name="Bedrooms", outputs=[RELAY], pid_interval="10", system="electric")
+  zone = Zone(config, REDIS, MQTT, mode="shadow")
+  zone.pid = FixedPID(1.0)
+
+  run_ticks(zone, 1)
+
+  data = json.loads(redis_client.get("heating/shadow/zones/Bedrooms"))
+  assert data["system"] == "electric"
+  assert zone.has_end_switch is False

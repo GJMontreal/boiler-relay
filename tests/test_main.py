@@ -105,7 +105,7 @@ def test_build_makes_active_threads_that_publish_under_active(fakes):
   zones, boiler = entry.build(system)
 
   assert zones[0].mode == "active"
-  assert boiler.publisher.prefix == "boiler_relay/active"
+  assert boiler.publisher.prefix == "heating/active"
 
 
 def test_build_in_shadow_mode_makes_a_boiler_that_follows_the_zones(fakes):
@@ -115,7 +115,7 @@ def test_build_in_shadow_mode_makes_a_boiler_that_follows_the_zones(fakes):
 
   assert zones[0].mode == "shadow"
   assert boiler.zones == zones
-  assert boiler.publisher.prefix == "boiler_relay/shadow"
+  assert boiler.publisher.prefix == "heating/shadow"
   assert not hasattr(boiler, "end_switches")
 
 

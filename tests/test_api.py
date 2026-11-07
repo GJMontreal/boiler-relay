@@ -81,8 +81,8 @@ def test_a_reading_older_than_two_hours_is_stale(client, redis_client):
 
 
 def test_live_includes_the_published_active_and_shadow_state(client, redis_client):
-  redis_client.set("boiler_relay/active/zones/Bedrooms", json.dumps({"control_value": 0.5, "state": 1, "time": timestamp()}))
-  redis_client.set("boiler_relay/shadow/zones/Bedrooms", json.dumps({"control_value": 0.4, "state": 0, "time": timestamp()}))
+  redis_client.set("heating/active/zones/Bedrooms", json.dumps({"control_value": 0.5, "state": 1, "time": timestamp()}))
+  redis_client.set("heating/shadow/zones/Bedrooms", json.dumps({"control_value": 0.4, "state": 0, "time": timestamp()}))
 
   data = zone(client)
 

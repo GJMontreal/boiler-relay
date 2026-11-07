@@ -19,7 +19,7 @@ DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "config" / "system_con
 def parse_arguments(argv=None):
   parser = ArgumentParser(description='Get config file path')
   parser.add_argument('--config', '-c', help = 'config file', default=str(DEFAULT_CONFIG))
-  parser.add_argument('--shadow', action = 'store_true', help = 'decide without driving any output and publish under boiler_relay/shadow/')
+  parser.add_argument('--shadow', action = 'store_true', help = 'decide without driving any output and publish under heating/shadow/')
   return parser.parse_args(argv)
 
 def build(system, shadow=False):

@@ -170,7 +170,7 @@ def make_shadow(zones, redis_client):
 
 def shadow_call(redis_client):
   import json
-  return json.loads(redis_client.get("boiler_relay/shadow/boiler"))["call"]
+  return json.loads(redis_client.get("heating/shadow/hydronic/boiler"))["call"]
 
 
 def test_the_shadow_boiler_calls_when_a_zone_with_an_end_switch_heats(redis_client, gpio, run_ticks):
@@ -197,7 +197,7 @@ def test_the_shadow_boiler_beats_and_touches_no_gpio(redis_client, gpio, run_tic
 
   run_ticks(thread, 1)
 
-  assert redis_client.get("boiler_relay/shadow/heartbeat") is not None
+  assert redis_client.get("heating/shadow/heartbeat") is not None
   assert gpio == []
 
 
@@ -210,5 +210,5 @@ def test_the_active_boiler_publishes_its_call_and_a_heartbeat(redis_client, gpio
   run_ticks(thread, 1)
 
   import json
-  assert json.loads(redis_client.get("boiler_relay/active/boiler"))["call"] == 1
-  assert redis_client.get("boiler_relay/active/heartbeat") is not None
+  assert json.loads(redis_client.get("heating/active/hydronic/boiler"))["call"] == 1
+  assert redis_client.get("heating/active/heartbeat") is not None
