@@ -14,7 +14,6 @@ Known breakage in the new code:
 
 - `main.py` imports `unopt`, which is not in `requirements.txt`. `paho-mqtt` is also missing.
 - `ZoneConfig` follows the `system_config.json` zone shape (`sensor_path`, `outputs`). `config.json`, the `main.py` default, and `zones.json` still use the old `input_gpio` and `output_gpio` keys and fail to load.
-- `src/zone.py` `write_row_to_csv` uses `os` and `LOG_PATH` without defining them.
 - `src/actuator.py` `MQTTRelay` never sets `device_name` and publishes nothing. `main.create_output` calls `class_type(config)`, which does not fit the `Actuator` constructors, and nothing calls `create_output`.
 - `src/gpio.py` is a stub that prints. Real GPIO needs `Adafruit_BBIO.GPIO`, which only installs on the BeagleBone.
 - `deploy.sh` copies `src/*.py` but not `boiler_relay.py` or `main.py`.

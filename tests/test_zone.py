@@ -60,3 +60,28 @@ def test_start_starts_both_threads(redis_client, gpio, monkeypatch):
   zone.start()
 
   assert started == ["pid", "valve"]
+
+
+def test_write_row_to_csv_appends_to_zone_log(redis_client, gpio, tmp_path, monkeypatch):
+  monkeypatch.setattr("src.zone.LOG_PATH", str(tmp_path))
+  zone = make_zone()
+
+  zone.write_row_to_csv(["t0", "18.0"])
+  zone.write_row_to_csv(["t1", "18.5"])
+
+  assert (tmp_path / "Bedrooms_pid.csv").read_text().splitlines() == ["t0,18.0", "t1,18.5"]
+
+
+def test_write_row_formats_the_sample(redis_client, gpio, tmp_path, monkeypatch):
+  monkeypatch.setattr("src.zone.LOG_PATH", str(tmp_path))
+  zone = make_zone()
+  zone.last_sample_time = "t0"
+  zone.current_temperature = 18.04
+  zone.target_temperature = 21
+  zone.control_value = 0.5
+
+  zone.write_row()
+
+  row = (tmp_path / "Bedrooms_pid.csv").read_text().strip().split(",")
+  assert row[:4] == ["t0", "18.0", "21.0", "60"]
+  assert len(row) == 7
