@@ -6,10 +6,12 @@ from pathlib import Path
 from threading import Event
 
 from redis import Redis
+from redis.exceptions import RedisError
 
 from boiler_relay.boiler_thread import BoilerThread, ShadowBoilerThread
 from boiler_relay.config import ConfigError, SystemConfig
-from boiler_relay.state_publisher import ACTIVE, SHADOW, StatePublisher
+from boiler_relay.state_publisher import ACTIVE, SHADOW, StatePublisher, publish_version
+from boiler_relay.version import describe
 from boiler_relay.zone import Zone
 
 log = logging.getLogger("boiler_relay")
@@ -19,6 +21,7 @@ DEFAULT_CONFIG = Path(__file__).resolve().parent.parent / "config" / "system_con
 def parse_arguments(argv=None):
   parser = ArgumentParser(description='Get config file path')
   parser.add_argument('--config', '-c', help = 'config file', default=str(DEFAULT_CONFIG))
+  parser.add_argument('--version', action = 'version', version = describe())
   parser.add_argument('--shadow', action = 'store_true', help = 'decide without driving any output and publish under heating/shadow/')
   return parser.parse_args(argv)
 
@@ -31,6 +34,12 @@ def build(system, shadow=False):
   else:
     boiler = BoilerThread(system.boiler, system.end_switches, publisher)
   return zones, boiler
+
+def announce(redis_config):
+  try:
+    publish_version(Redis(host=redis_config.host, port=redis_config.port, db=0))
+  except RedisError as error:
+    log.warning("could not publish the version: %s", error)
 
 def supervise(threads, stop, poll=1.0):
   while not stop.is_set():
@@ -61,6 +70,7 @@ def main(argv=None):
   signal.signal(signal.SIGTERM, lambda *_: stop.set())
   signal.signal(signal.SIGINT, lambda *_: stop.set())
 
+  announce(system.redis)
   for zone in zones:
     zone.start()
   boiler.start()

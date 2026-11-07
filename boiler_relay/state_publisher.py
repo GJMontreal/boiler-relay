@@ -1,9 +1,21 @@
 from datetime import datetime, timezone
 from json import dumps
 
+from boiler_relay.version import __version__, read_commit
+
 ACTIVE = "active"
 SHADOW = "shadow"
 TIME_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+VERSION_KEY = "heating/versions/boiler-relay"
+
+
+def now():
+    return datetime.now(timezone.utc).strftime(TIME_FORMAT)
+
+
+def publish_version(redis):
+    payload = {"version": __version__, "commit": read_commit(), "time": now()}
+    redis.set(VERSION_KEY, dumps(payload))
 
 
 class StatePublisher:
@@ -21,5 +33,5 @@ class StatePublisher:
         self.write("heartbeat", {})
 
     def write(self, suffix, payload):
-        payload["time"] = datetime.now(timezone.utc).strftime(TIME_FORMAT)
+        payload["time"] = now()
         self.redis.set(f"{self.prefix}/{suffix}", dumps(payload))

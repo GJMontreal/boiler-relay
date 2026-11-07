@@ -2,6 +2,7 @@ import logging
 import signal
 from threading import Event
 
+import fakeredis
 import pytest
 
 from boiler_relay import __main__ as entry
@@ -38,7 +39,7 @@ class FakeThread:
 
 
 @pytest.fixture
-def fakes(monkeypatch):
+def fakes(monkeypatch, redis_server):
   created = type("Created", (), {"zones": [], "boilers": []})
 
   def make_zone(zone_config, redis_config, mqtt_config, mode="active"):
@@ -65,6 +66,7 @@ def fakes(monkeypatch):
   monkeypatch.setattr(entry, "BoilerThread", make_boiler)
   monkeypatch.setattr(entry, "ShadowBoilerThread", make_shadow_boiler)
   monkeypatch.setattr(entry.signal, "signal", lambda *args: None)
+  monkeypatch.setattr(entry, "Redis", lambda **kwargs: fakeredis.FakeRedis(server=redis_server))
   return created
 
 
@@ -211,3 +213,30 @@ def test_main_stops_on_sigterm_and_sigint(tmp_path, fakes, monkeypatch):
 
   assert entry.main(["-c", write_config(tmp_path, VALID)]) == 0
   assert set(handlers) == {signal.SIGTERM, signal.SIGINT}
+
+
+@pytest.mark.parametrize("flags", [[], ["--shadow"]])
+def test_main_publishes_the_version_in_both_modes(tmp_path, fakes, monkeypatch, redis_server, flags):
+  monkeypatch.setattr(entry, "supervise", lambda threads, stop: 0)
+
+  assert entry.main(["-c", write_config(tmp_path, VALID), *flags]) == 0
+
+  data = fakeredis.FakeRedis(server=redis_server).get("heating/versions/boiler-relay")
+  assert b'"version"' in data
+
+
+def test_main_keeps_going_when_the_version_cannot_be_published(tmp_path, fakes, monkeypatch, caplog):
+  from redis.exceptions import ConnectionError as RedisConnectionError
+
+  def refuse(redis):
+    raise RedisConnectionError("redis is down")
+
+  monkeypatch.setattr(entry, "publish_version", refuse)
+  monkeypatch.setattr(entry, "supervise", lambda threads, stop: 0)
+
+  with caplog.at_level(logging.WARNING, logger="boiler_relay"):
+    code = entry.main(["-c", write_config(tmp_path, VALID)])
+
+  assert code == 0
+  assert fakes.zones[0].started
+  assert "could not publish the version" in caplog.text

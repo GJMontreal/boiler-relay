@@ -130,5 +130,6 @@ dmypy.json
 
 dump.rdb
 deploy/setup_python.sh
+build_info.json
 deploy/boiler_relay_v2.service
 deploy/boiler_relay_v2_shadow.service

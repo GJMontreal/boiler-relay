@@ -43,6 +43,13 @@ cp boiler_relay/outputs/*.py "${STAGE}/boiler_relay/outputs/"
 cp config/system_config.json "${STAGE}/config/"
 cp deploy/setup_python.sh "deploy/${SERVICE_NAME}.service" "deploy/${SERVICE_NAME}_shadow.service" "${STAGE}/deploy/"
 cp -R deploy/boiler_relay.service.d "${STAGE}/deploy/"
+
+VERSION=$(sed -n 's/^__version__ = "\(.*\)"$/\1/p' boiler_relay/version.py)
+COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)
+if [ "${COMMIT}" != unknown ] && [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    COMMIT="${COMMIT}-dirty"
+fi
+printf '{"version": "%s", "commit": "%s"}\n' "${VERSION}" "${COMMIT}" > "${STAGE}/build_info.json"
 chmod -R u=rwX,go=rX "${STAGE}"
 
 SSH_CMD="ssh ${REMOTE_USER}@${REMOTE_HOST}"
