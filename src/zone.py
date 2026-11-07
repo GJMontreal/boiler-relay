@@ -1,11 +1,12 @@
 import csv
 import os
 
+from src.actuator import create_output
 from src.output_thread import LOG_PATH, PIDThread
 from src.zone_valve_thread import ZoneValveThread
 
 class Zone():
-    def __init__(self, zone_config, redis_config):
+    def __init__(self, zone_config, redis_config, mqtt_config):
         self.name = zone_config.name
         self.input_path = zone_config.sensor_path
         self.output_path = zone_config.control_path
@@ -23,6 +24,14 @@ class Zone():
                                                  self,
                                                  redis_config)
 
+        self.actuators = []
+        for output in zone_config.outputs:
+            if output.get("type") == "gpio":
+                continue
+            actuator = create_output(output, self.input_path, redis_config, mqtt_config)
+            if actuator is not None:
+                self.actuators.append(actuator)
+
         self.control_value = 0
         self.target_temperature = 0
         self.current_temperature = 0
@@ -31,6 +40,8 @@ class Zone():
     def start(self):
         self.pid_thread.start()
         self.zone_valve_thread.start()
+        for actuator in self.actuators:
+            actuator.start()
 
     def write_row(self):
         p, i, d = self.pid_thread.pid.components

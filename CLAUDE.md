@@ -10,7 +10,7 @@ Known breakage in the new code:
 
 - `main.py` imports `unopt`, which is not in `requirements.txt`. `paho-mqtt` is also missing.
 - `ZoneConfig` follows the `system_config.json` zone shape (`sensor_path`, `outputs`). `config.json`, the `main.py` default, still uses the old `input_gpio` and `output_gpio` keys and fails to load.
-- `src/actuator.py` `MQTTRelay` never sets `device_name` and publishes nothing. `main.create_output` calls `class_type(config)`, which does not fit the `Actuator` constructors, and nothing calls `create_output`.
+- `src/actuator.py` `MQTTRelay` builds the message and prints it. It does not publish to MQTT yet.
 - `src/gpio.py` is a stub that prints. Real GPIO needs `Adafruit_BBIO.GPIO`, which only installs on the BeagleBone.
 - `deploy.sh` copies `src/*.py` but not `main.py`. The unit files still run the deleted `boiler_relay.py`.
 
@@ -21,7 +21,7 @@ Known breakage in the new code:
 - `src/output_thread.py`: `PIDThread` (reads temperature and setpoint from redis, writes `output_path`), `ZoneLoggingThread`.
 - `src/boiler_thread.py`: `BoilerThread`, turns the boiler output on when any pin in the top-level `inputs` list is high.
 - `src/zone_valve_thread.py`: turns `control_value` into a time-proportioned on/off cycle on the zone GPIOs.
-- `src/actuator.py`: `Actuator` base class that polls redis `<path>/value`, plus `MQTTRelay`.
+- `src/actuator.py`: `Actuator` base class that polls redis `<path>/heating_cooling_state`, plus `MQTTRelay` and `create_output`. `Zone` builds one actuator per non-gpio output through `create_output`. A new actuator type is a subclass constructed as `(path, redis_config, mqtt_config, output_config)`.
 - `src/config.py`: dataclass configs with `from_file`.
 - `src/gpio.py`: GPIO wrapper for development off the BeagleBone.
 - `config.json`: legacy zone and boiler config. `system_config.json`: the new config shape, with `mqtt`, `redis`, `zones`, `boiler` and `inputs`.

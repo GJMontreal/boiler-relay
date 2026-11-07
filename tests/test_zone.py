@@ -1,9 +1,12 @@
 import pytest
 
-from src.config import RedisConfig, ZoneConfig
+from src.actuator import MQTTRelay
+from src.config import MQTTConfig, RedisConfig, ZoneConfig
 from src.zone import Zone
 
 REDIS = RedisConfig(host="redis.local", port=6380)
+MQTT = MQTTConfig(host="broker.local", port=1883, keep_alive=60)
+RELAY = {"type": "MQTTRelay", "topic": "cmnd/x/ZbSend", "device": "0xB5EA"}
 
 
 def make_zone(outputs=(), active_low=False):
@@ -15,7 +18,7 @@ def make_zone(outputs=(), active_low=False):
     control_interval="10",
     active_low=active_low,
   )
-  return Zone(config, REDIS)
+  return Zone(config, REDIS, MQTT)
 
 
 def test_zone_reads_sensor_and_writes_control_value(redis_client, gpio):
@@ -30,7 +33,7 @@ def test_zone_reads_sensor_and_writes_control_value(redis_client, gpio):
 def test_valve_thread_drives_only_gpio_outputs(redis_client, gpio):
   zone = make_zone([
     {"type": "gpio", "pin": "P8_10"},
-    {"type": "MQTTRelay", "topic": "cmnd/x", "device": "0xB5EA"},
+    RELAY,
     {"type": "gpio", "pin": "P8_14"},
   ])
 
@@ -91,3 +94,36 @@ def test_threads_connect_with_the_redis_config(redis_client, redis_connections, 
   make_zone()
 
   assert redis_connections == [{"host": "redis.local", "port": 6380, "db": 0}] * 2
+
+
+def test_zone_builds_an_actuator_for_each_non_gpio_output(redis_client, gpio):
+  zone = make_zone([{"type": "gpio", "pin": "P8_10"}, RELAY, RELAY])
+
+  assert len(zone.actuators) == 2
+  assert all(isinstance(actuator, MQTTRelay) for actuator in zone.actuators)
+  assert zone.actuators[0].path == "/home/sensors/a"
+  assert zone.actuators[0].mqtt_config is MQTT
+
+
+def test_zone_skips_outputs_of_unknown_type(redis_client, gpio):
+  zone = make_zone([{"type": "Toaster"}, RELAY])
+
+  assert len(zone.actuators) == 1
+
+
+def test_zone_without_extra_outputs_has_no_actuators(redis_client, gpio):
+  zone = make_zone([{"type": "gpio", "pin": "P8_10"}])
+
+  assert zone.actuators == []
+
+
+def test_start_starts_the_actuators(redis_client, gpio, monkeypatch):
+  zone = make_zone([RELAY])
+  started = []
+  monkeypatch.setattr(zone.pid_thread, "start", lambda: None)
+  monkeypatch.setattr(zone.zone_valve_thread, "start", lambda: None)
+  monkeypatch.setattr(zone.actuators[0], "start", lambda: started.append("relay"))
+
+  zone.start()
+
+  assert started == ["relay"]

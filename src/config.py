@@ -57,5 +57,5 @@ class ZoneConfig(Config):
 
 @dataclass
 class RelayConfig(Config):
-  device_name: str
+  device: str
   topic: str

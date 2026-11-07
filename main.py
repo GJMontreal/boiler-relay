@@ -6,7 +6,6 @@ from src.zone import Zone
 
 from json import load
 from unopt import *
-from importlib import import_module
 from pprint import pprint
 
 def read_config(config_path) -> Namespace | None:
@@ -25,26 +24,10 @@ def parse_arguments() -> Namespace:
   args = parser.parse_args()
   return args
 
-def create_output(output_config,config):
-  if "type" not in output_config:
-    print("missing output type")
-    return
-  
-  module = import_module("src.actuator")
-  type_name = output_config["type"]
-  try:
-    class_type = getattr(module, type_name)
-  except:
-    print(f"Unsupported output type: {type_name}")
-    return
-  
-  instance = class_type(config)
-  return instance
-  
-def create_zone(zone_config, redis_config):
+def create_zone(zone_config, redis_config, mqtt_config):
 
   try:
-    zone = Zone(ZoneConfig(**zone_config),redis_config)
+    zone = Zone(ZoneConfig(**zone_config),redis_config,mqtt_config)
     return zone
   except Exception as error:
     print(f"Failed to create zone. {error}")
@@ -77,7 +60,7 @@ if __name__ == "__main__":
     print("Missing boiler configuration")
     boiler_config = None
 
-  zones = [create_zone(zone, redis_config) for zone in config.zones]
+  zones = [create_zone(zone, redis_config, mqtt_config) for zone in config.zones]
   [zone.start() for zone in zones if zone is not None]
   if boiler_config is not None:
     BoilerThread(boiler_config, getattr(config, "inputs", [])).start()

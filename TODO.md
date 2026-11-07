@@ -7,9 +7,7 @@
 
 ## Outputs
 
-- [ ] Wire `create_output` into zone setup so each zone builds its list of outputs.
-- [ ] Give `Actuator` subclasses one constructor shape that `create_output` can call.
-- [ ] Finish `MQTTRelay`: set `device_name`, publish the message to the topic.
+- [ ] Finish `MQTTRelay`: publish the message to the topic over MQTT.
 - [ ] Add a GPIO actuator so `type: gpio` outputs work.
 - [ ] Move active-low handling to the output, per zone.
 
@@ -30,7 +28,7 @@
 
 ## Quality
 
-- [ ] Add tests for `MQTTRelay` and `main.py` config loading.
+- [ ] Add tests for `main.py` config loading.
 - [ ] Replace `print` with `logging`.
 - [ ] Add a clean shutdown path for the threads and GPIO cleanup.
 - [ ] Update `.vscode/launch.json`, which still launches the `output_thread` module.
