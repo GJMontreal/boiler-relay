@@ -59,6 +59,8 @@ Each service also publishes its decisions as JSON with a `time` field. `<mode>` 
 | `heating/<mode>/hydronic/boiler` | boiler thread | `call` (0 or 1) and `time`. The shadow service derives the call from its zones' decisions, because it reads no pin |
 | `heating/<mode>/heartbeat` | boiler thread | `time`, once per poll |
 
+The read-only API and web interface live in the `heating-web` repo. It is deployed and versioned apart from this service, and it reads these keys. It also reads this project's `config/system_config.json` for each zone's name, sensor path and system.
+
 ## Configuration
 Zones, the boiler output and the redis and MQTT endpoints are described in JSON. `config/system_config.json` is the default config file. A zone is one sensor, one PID and one kind of output: local GPIO pins or an MQTT relay. Each zone names its `system`, `hydronic` or `electric`. A gpio output on a hydronic zone may name an `end_switch` pin, and the boiler follows all of them. The config needs at least one hydronic zone with an `end_switch`. A zone can also set `control_interval` (the duty window in minutes) and `pid` gains. The program refuses to start on a config it cannot use, and says why.
 
