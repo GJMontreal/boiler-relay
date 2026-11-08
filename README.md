@@ -67,9 +67,11 @@ Zones, the boiler output and the redis and MQTT endpoints are described in JSON.
 The end switch pairing is verified on the device for all five valves, by boost tests read through sysfs on 2026-11-07.
 
 - **Common and Kitchen** were swapped in the old config. Common's valve (`P8_8`) reports on `P8_15` and Kitchen's valve (`P8_16`) reports on `P8_7`, so the config pairs them that way.
-- **Bedrooms** (`P8_10` with `P8_9`, `P8_14` with `P8_17`) match the config.
+- **Bedrooms** (`P8_10` with `P8_9`, `P8_14` with `P8_17`) match the config. Both switches rose with both outputs on, at 19:53 local. The test cannot say which switch belongs to which output, and the boiler follows both. `P8_17` needs its internal pull disabled. It powers on with a pulldown and reads low until it is set to gpio mode.
 - **Study** (`P8_12` with `P8_11`) matches the config. `P8_11` rose about 3.5 minutes after the boost and fell about 3 minutes after the close.
 - **BackRoom** (`P8_28` with `P8_27`) matches the config. `P8_27` rose about 3.5 minutes after the boost.
+
+The service sets every end switch input to gpio mode with the pull disabled when it starts, so no input relies on its power-on state.
 
 The BackRoom end switch is faulty. After the control loop turned the output off at 16:39:51 local on 2026-11-07, `P8_27` stayed high for about 10 minutes, until the actuator was pushed by hand. Until the switch is replaced, a BackRoom call can leave `P8_27` high and keep the boiler on with no demand.
 

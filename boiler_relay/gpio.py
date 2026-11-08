@@ -10,8 +10,12 @@ class StubGPIO():
   LOW = 0
   HIGH = 1
 
+  PUD_OFF = 0
+  PUD_DOWN = 1
+  PUD_UP = 2
+
   @classmethod
-  def setup(cls, pin, state):
+  def setup(cls, pin, state, pull_up_down=PUD_OFF):
     log.debug('gpio setup')
 
   @classmethod

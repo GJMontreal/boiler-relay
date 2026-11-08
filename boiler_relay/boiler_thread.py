@@ -37,7 +37,7 @@ class BoilerThread(Thread):
     def config_inputs(self):
         for gpio in self.input_gpio:
             log.info("configuring GPIO %s as input", gpio)
-            GPIO.setup(gpio, GPIO.IN)
+            GPIO.setup(gpio, GPIO.IN, pull_up_down=GPIO.PUD_OFF)
 
     def run(self):
         while not self.stopping.is_set():

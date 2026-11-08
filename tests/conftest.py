@@ -57,7 +57,12 @@ def gpio_inputs():
 
 
 @pytest.fixture
-def gpio(monkeypatch, gpio_inputs):
+def gpio_setups():
+  return []
+
+
+@pytest.fixture
+def gpio(monkeypatch, gpio_inputs, gpio_setups):
   calls = []
 
   class RecordingGPIO:
@@ -65,10 +70,13 @@ def gpio(monkeypatch, gpio_inputs):
     IN = 0
     LOW = 0
     HIGH = 1
+    PUD_OFF = 0
+    PUD_DOWN = 1
+    PUD_UP = 2
 
     @classmethod
-    def setup(cls, pin, state):
-      pass
+    def setup(cls, pin, state, pull_up_down=PUD_OFF):
+      gpio_setups.append((pin, state, pull_up_down))
 
     @classmethod
     def cleanup(cls):

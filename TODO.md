@@ -28,5 +28,6 @@ The project controls two systems, set per zone by the `system` field. Hydronic i
 - [x] Confirm the Bedrooms end-switch pairing: `P8_10` with `P8_9` and `P8_14` with `P8_17`.
 - [ ] Review the device's login credentials and remote access.
 - [ ] The `back_room` sensor stopped reporting on 2026-10-24. Check its battery.
-- [ ] Add a GPIO pull-up or pull-down choice for the end-switch inputs if the wiring needs one.
+- [x] Set every end-switch input to gpio mode with the pull disabled, so no pin relies on its power-on state.
+- [ ] Check on the device that the service user can write the pinmux state files, or that `GPIO.setup` on an end-switch input succeeds at startup.
 - [ ] Move PID gains per zone only if the stairwell radiator needs different ones. The config already supports it.

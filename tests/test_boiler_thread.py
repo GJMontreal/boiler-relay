@@ -31,6 +31,13 @@ def test_init_drives_output_inactive(gpio):
   assert outputs(gpio) == [1]
 
 
+def test_every_end_switch_input_is_set_up_with_the_pull_disabled(gpio, gpio_setups):
+  make_thread()
+
+  inputs = [setup for setup in gpio_setups if setup[0] in INPUTS]
+  assert inputs == [(pin, 0, 0) for pin in INPUTS]
+
+
 def test_polls_at_the_configured_interval(gpio):
   assert make_thread(poll_interval="10").interval == 10.0
 
