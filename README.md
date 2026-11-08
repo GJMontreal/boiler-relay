@@ -102,8 +102,9 @@ The script prints the command that copies the units to `/etc/systemd/system` and
 
 - `legacy` runs `boiler_relay` and enables it at boot.
 - `v2` runs `boiler_relay_v2` and enables it at boot. Starting it stops the legacy service at once, so the script prints the running services it will stop and refuses to go on without `--confirm`.
-- `shadow` keeps `boiler_relay` in control and adds `boiler_relay_v2_shadow`. The shadow unit has no `[Install]` section, so it never starts at boot.
+- `shadow` keeps `boiler_relay` in control and adds `boiler_relay_v2_shadow`. It enables both at boot and disables `boiler_relay_v2`.
+- `legacy` and `v2` disable the shadow at boot.
 
-`boiler_relay_v2_shadow.service` runs `python -m boiler_relay --shadow`. Shadow mode reads the same sensor keys and makes the same decisions, but it drives no GPIO, sends no MQTT and writes only under `heating/shadow/`. The active service publishes the same keys under `heating/active/`.
+`boiler_relay_v2_shadow.service` runs `python -m boiler_relay --shadow`. It starts at boot once enabled, after `redis-server` and `mosquitto`. `deploy.sh` prints `sudo systemctl enable boiler_relay_v2_shadow`, which enables only the shadow and never starts or enables `boiler_relay_v2`. The deploy installs and starts nothing itself. Shadow mode reads the same sensor keys and makes the same decisions, but it drives no GPIO, sends no MQTT and writes only under `heating/shadow/`. The active service publishes the same keys under `heating/active/`.
 
 The scripts never touch `mqtt_bridge.service`. The bridge lives in `GJMontreal/mqtt-bridge`, and the legacy, v2 and shadow services and Homebridge all read what it writes.

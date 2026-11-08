@@ -66,4 +66,6 @@ ${SSH_CMD} sh "${INSTALL_DIR}/deploy/setup_python.sh"
 
 echo "to install the units and the legacy drop-in run on the device:"
 echo "sudo cp ${INSTALL_DIR}/deploy/*.service /etc/systemd/system/ && sudo mkdir -p /etc/systemd/system/boiler_relay.service.d && sudo cp ${INSTALL_DIR}/deploy/boiler_relay.service.d/conflicts.conf /etc/systemd/system/boiler_relay.service.d/ && sudo systemctl daemon-reload"
+echo "to start the shadow at boot, without starting ${SERVICE_NAME}, run on the device:"
+echo "sudo systemctl enable ${SERVICE_NAME}_shadow"
 echo "then run deploy/switch.sh ${REMOTE_USER} ${REMOTE_HOST} legacy|v2|shadow"

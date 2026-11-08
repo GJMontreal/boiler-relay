@@ -1,6 +1,6 @@
 [Unit]
 Description=Heating Zone and Boiler Control (shadow)
-After=redis.service
+After=redis-server.service mosquitto.service
 Conflicts=<service_name>.service
 
 [Service]
@@ -11,3 +11,6 @@ ExecStart=/var/lib/<service_name>/.venv/bin/python -m boiler_relay --shadow
 Restart=on-failure
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONPATH=/var/lib/<service_name>
+
+[Install]
+WantedBy=multi-user.target

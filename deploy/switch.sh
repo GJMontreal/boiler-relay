@@ -28,9 +28,9 @@ SHADOW=boiler_relay_v2_shadow
 WAIT_SECONDS=30
 
 case "${TARGET}" in
-    legacy) STOP=("${V2}" "${SHADOW}"); START=("${LEGACY}"); ENABLE=${LEGACY}; DISABLE=${V2} ;;
-    v2) STOP=("${LEGACY}" "${SHADOW}"); START=("${V2}"); ENABLE=${V2}; DISABLE=${LEGACY} ;;
-    shadow) STOP=("${V2}"); START=("${LEGACY}" "${SHADOW}"); ENABLE=${LEGACY}; DISABLE=${V2} ;;
+    legacy) STOP=("${V2}" "${SHADOW}"); START=("${LEGACY}"); ENABLE=("${LEGACY}"); DISABLE=("${V2}" "${SHADOW}") ;;
+    v2) STOP=("${LEGACY}" "${SHADOW}"); START=("${V2}"); ENABLE=("${V2}"); DISABLE=("${LEGACY}" "${SHADOW}") ;;
+    shadow) STOP=("${V2}"); START=("${LEGACY}" "${SHADOW}"); ENABLE=("${LEGACY}" "${SHADOW}"); DISABLE=("${V2}") ;;
     *)
         echo "${USAGE}"
         exit 1
@@ -96,7 +96,11 @@ for UNIT in "${START[@]}"; do
     fi
 done
 
-sctl enable "${ENABLE}"
-if unit_exists "${DISABLE}"; then
-    sctl disable "${DISABLE}"
-fi
+for UNIT in "${ENABLE[@]}"; do
+    sctl enable "${UNIT}"
+done
+for UNIT in "${DISABLE[@]}"; do
+    if unit_exists "${UNIT}"; then
+        sctl disable "${UNIT}"
+    fi
+done
