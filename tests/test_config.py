@@ -209,6 +209,92 @@ def test_the_shipped_config_runs_candidate_gains_in_the_shadow_only():
   assert all(zone.pid == today for zone in config.zones_for(True) if zone.system == "electric")
 
 
+TOP_PID = {"kp": 2, "ki": 0.02, "kd": 0.1, "integral_cap": 0.5}
+TODAY = PIDConfig(kp=1, ki=0.01, kd=0.5, integral_cap=1.0)
+
+
+def effective(config, shadow):
+  return {zone.name: zone.pid for zone in config.zones_for(shadow)}
+
+
+def test_a_zone_pid_block_wins_over_the_top_level_pid():
+  config = SystemConfig.from_dict(system(zones=[zone(pid={"kp": 3})], pid=TOP_PID))
+
+  assert effective(config, False) == {"Bedrooms": PIDConfig(kp=3)}
+
+
+def test_the_top_level_pid_is_the_default_for_every_zone_without_a_block():
+  config = SystemConfig.from_dict(system(zones=[ZONE, ELECTRIC_ZONE], pid=TOP_PID))
+
+  assert effective(config, False) == {"Bedrooms": PIDConfig(**TOP_PID), "Stairwell": PIDConfig(**TOP_PID)}
+
+
+def test_a_null_zone_pid_falls_back_to_the_top_level_pid():
+  config = SystemConfig.from_dict(system(zones=[zone(pid=None)], pid=TOP_PID))
+
+  assert effective(config, False) == {"Bedrooms": PIDConfig(**TOP_PID)}
+
+
+def test_with_neither_block_a_zone_gets_the_built_in_defaults():
+  config = SystemConfig.from_dict(system(zones=[ZONE, ELECTRIC_ZONE]))
+
+  assert config.pid is None
+  assert effective(config, False) == {"Bedrooms": TODAY, "Stairwell": TODAY}
+
+
+def test_shadow_mode_replaces_every_hydronic_zone_whatever_the_zone_or_the_top_level_says():
+  zones = [zone(pid={"kp": 3}), zone(name="Study", sensor_path="/home/sensors/c", outputs=[{**VALVE, "pin": "P8_12", "end_switch": "P8_11"}])]
+  config = SystemConfig.from_dict(system(zones=zones, pid=TOP_PID, shadow={"pid": SHADOW_PID}))
+
+  assert effective(config, True) == {"Bedrooms": PIDConfig(**SHADOW_PID), "Study": PIDConfig(**SHADOW_PID)}
+  assert effective(config, False) == {"Bedrooms": PIDConfig(kp=3), "Study": PIDConfig(**TOP_PID)}
+
+
+def test_an_electric_zone_in_shadow_mode_follows_the_active_precedence():
+  own = {**ELECTRIC_ZONE, "pid": {"kp": 4}}
+  shadow = {"pid": SHADOW_PID}
+
+  top = SystemConfig.from_dict(system(zones=[ZONE, ELECTRIC_ZONE], pid=TOP_PID, shadow=shadow))
+  block = SystemConfig.from_dict(system(zones=[ZONE, own], pid=TOP_PID, shadow=shadow))
+  neither = SystemConfig.from_dict(system(zones=[ZONE, ELECTRIC_ZONE], shadow=shadow))
+
+  assert effective(top, True)["Stairwell"] == PIDConfig(**TOP_PID)
+  assert effective(block, True)["Stairwell"] == PIDConfig(kp=4)
+  assert effective(neither, True)["Stairwell"] == TODAY
+
+
+@pytest.mark.parametrize("pid", [
+  {"kp": -1},
+  {"ki": "0.01"},
+  {"kd": float("nan")},
+  {"integral_cap": 1.5},
+  {"integral_cap": True},
+])
+def test_an_invalid_top_level_pid_is_rejected_by_name(pid):
+  with pytest.raises(ConfigError, match="top-level pid"):
+    SystemConfig.from_dict(system(pid=pid))
+
+
+@pytest.mark.parametrize("pid", [{"kq": 1}, [1, 0.01, 0.5], "1"])
+def test_a_malformed_top_level_pid_is_rejected_by_name(pid):
+  with pytest.raises(ConfigError, match="top-level pid"):
+    SystemConfig.from_dict(system(pid=pid))
+
+
+def test_the_shipped_config_writes_the_live_gains_out_explicitly():
+  with open(CONFIG_PATH) as file:
+    data = json_load(file)
+  config = SystemConfig.from_file(CONFIG_PATH)
+
+  assert data["pid"] == {"kp": 1, "ki": 0.01, "kd": 0.5, "integral_cap": 1.0}
+  assert config.pid == TODAY
+  assert all(pid == TODAY for pid in effective(config, False).values())
+  hydronic = {zone.name for zone in config.zones if zone.system == "hydronic"}
+  shadow = effective(config, True)
+  assert all(shadow[name] == PIDConfig(**SHADOW_PID) for name in hydronic)
+  assert all(pid == TODAY for name, pid in shadow.items() if name not in hydronic)
+
+
 def test_zone_config_derives_control_path():
   assert ZoneConfig(**ZONE).control_path == "/home/sensors/a/control_value"
 

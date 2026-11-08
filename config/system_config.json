@@ -76,6 +76,7 @@
             "control_interval": 10
         }
     ],
+    "pid": {"kp": 1, "ki": 0.01, "kd": 0.5, "integral_cap": 1.0},
     "boiler": {
         "output_gpio": "P8_18",
         "poll_interval": 5

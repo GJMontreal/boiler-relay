@@ -122,7 +122,7 @@ class ShadowConfig(Config):
       except ConfigError as error:
         raise ConfigError(f"shadow: {error}")
 
-SECTIONS = {"redis", "boiler", "zones", "mqtt", "shadow"}
+SECTIONS = {"redis", "boiler", "zones", "mqtt", "shadow", "pid"}
 
 @dataclass
 class SystemConfig(Config):
@@ -131,6 +131,7 @@ class SystemConfig(Config):
   zones: list[ZoneConfig]
   mqtt: MQTTConfig = None
   shadow: ShadowConfig = None
+  pid: PIDConfig = None
 
   @classmethod
   def from_dict(cls, data: dict) -> SystemConfig:
@@ -144,12 +145,12 @@ class SystemConfig(Config):
     redis = cls.build("redis", RedisConfig, data["redis"])
     boiler = cls.build("boiler", BoilerConfig, data["boiler"])
     mqtt = cls.build("mqtt", MQTTConfig, data["mqtt"]) if "mqtt" in data else None
-    zones = [cls.build(f"zone {entry.get('name', index)}", ZoneConfig, entry)
-             for index, entry in enumerate(data["zones"])]
+    pid = cls.build_default_pid(data["pid"]) if "pid" in data else None
+    zones = [cls.build_zone(index, entry, pid) for index, entry in enumerate(data["zones"])]
 
     shadow = cls.build("shadow", ShadowConfig, data["shadow"]) if "shadow" in data else None
 
-    config = cls(redis=redis, boiler=boiler, zones=zones, mqtt=mqtt, shadow=shadow)
+    config = cls(redis=redis, boiler=boiler, zones=zones, mqtt=mqtt, shadow=shadow, pid=pid)
     config.validate()
     return config
 
@@ -163,6 +164,22 @@ class SystemConfig(Config):
     except ValueError as error:
       raise ConfigError(f"{file_name} is not valid JSON: {error}")
     return cls.from_dict(data)
+
+  @staticmethod
+  def build_default_pid(entry):
+    try:
+      return PIDConfig(**entry)
+    except ConfigError as error:
+      raise ConfigError(f"top-level pid: {error}")
+    except (TypeError, ValueError) as error:
+      raise ConfigError(f"invalid top-level pid config: {error}")
+
+  @classmethod
+  def build_zone(cls, index, entry, default_pid):
+    zone = cls.build(f"zone {entry.get('name', index)}", ZoneConfig, entry)
+    if default_pid is not None and entry.get("pid") is None:
+      return replace(zone, pid=default_pid)
+    return zone
 
   @staticmethod
   def build(section, config_class, entry):

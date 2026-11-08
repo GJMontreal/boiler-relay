@@ -68,7 +68,9 @@ The `pid` block holds `kp`, `ki`, `kd` and `integral_cap`. The defaults are 1, 0
 
 The integral cap exists because the plant is slow. With the integral clamped only by the output limit, a zone that has called for heat for hours holds full output until the temperature passes the target. A cap of 0.3 lets the proportional term ease the output earlier.
 
-An optional top-level `shadow` section holds a `pid` block. In shadow mode it replaces the `pid` of every hydronic zone. Electric zones and the active service keep their own. The shipped config sets the shadow to Kp 1, Ki 0.001, Kd 0 and a cap of 0.3, so the shadow runs candidate gains while the legacy controller keeps its own.
+An optional top-level `pid` block sets the default gains for every zone that has no `pid` block of its own. It covers hydronic and electric zones alike, so the electric Stairwell zone follows it unless the zone gets its own block. A zone's own block replaces the default as a whole. Fields it leaves out take the built-in values, not the top-level ones. The precedence is the zone's `pid`, then the top-level `pid`, then the built-in 1, 0.01, 0.5 and 1.0. The top-level block follows the same rules as a zone block, and a bad value stops the program at load with a message that names the top-level `pid`. The shipped config writes the top-level block out as 1, 0.01, 0.5 and 1.0, so the live gains are visible in the file.
+
+An optional top-level `shadow` section holds a `pid` block. In shadow mode it replaces the `pid` of every hydronic zone, whatever the zone block or the top-level `pid` says. The active service ignores it. An electric zone in shadow mode follows the same precedence as the active service. The shipped config sets the shadow to Kp 1, Ki 0.001, Kd 0 and a cap of 0.3, so the shadow runs candidate gains while the legacy controller keeps its own.
 
 The end switch pairing is verified on the device for all five valves, by boost tests read through sysfs on 2026-11-07.
 
