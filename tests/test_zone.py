@@ -45,6 +45,9 @@ class RecordingOutput:
   def deactivate(self, wait=False):
     self.deactivations.append(wait)
 
+  def status(self):
+    return None
+
   def stop(self):
     self.stopped = True
 
@@ -644,3 +647,52 @@ def test_an_electric_zone_publishes_its_system(redis_client, gpio, run_ticks):
   data = json.loads(redis_client.get("heating/shadow/zones/Bedrooms"))
   assert data["system"] == "electric"
   assert zone.has_end_switch is False
+
+
+class ConfirmingOutput(RecordingOutput):
+  def status(self):
+    return {"confirmed": 1, "confirmed_time": "2026-11-08T10:00:00Z"}
+
+
+def test_a_zone_publishes_what_its_output_confirmed(redis_client, gpio, run_ticks):
+  seed(redis_client, current=18, target=21, state=1)
+  zone = make_fixed_zone(1.0)
+  zone.outputs = [ConfirmingOutput()]
+
+  run_ticks(zone, 1)
+
+  data = json.loads(redis_client.get("heating/active/zones/Bedrooms"))
+  assert data["confirmed"] == 1
+  assert data["confirmed_time"] == "2026-11-08T10:00:00Z"
+
+
+def test_a_zone_publishes_the_confirmation_before_the_target_state_exists(redis_client, gpio, run_ticks):
+  seed(redis_client, current=18, target=21)
+  zone = make_fixed_zone(1.0)
+  zone.outputs = [ConfirmingOutput()]
+
+  run_ticks(zone, 1)
+
+  data = json.loads(redis_client.get("heating/active/zones/Bedrooms"))
+  assert data["state"] is None
+  assert data["confirmed"] == 1
+
+
+def test_a_gpio_zone_publishes_a_null_confirmation(redis_client, gpio, run_ticks):
+  seed(redis_client, current=18, target=21, state=1)
+
+  run_ticks(make_fixed_zone(1.0, [VALVE]), 1)
+
+  data = json.loads(redis_client.get("heating/active/zones/Bedrooms"))
+  assert data["confirmed"] is None
+  assert data["confirmed_time"] is None
+
+
+def test_a_shadow_zone_publishes_a_null_confirmation(redis_client, gpio, run_ticks):
+  seed(redis_client, current=18, target=21, state=1)
+
+  run_ticks(make_shadow_zone(1.0), 1)
+
+  data = json.loads(redis_client.get("heating/shadow/zones/Bedrooms"))
+  assert data["confirmed"] is None
+  assert data["confirmed_time"] is None

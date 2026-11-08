@@ -26,6 +26,7 @@ def mqtt_clients(monkeypatch):
   class FakeInfo:
     def __init__(self, client):
       self.client = client
+      self.rc = client.rc
 
     def wait_for_publish(self, timeout=None):
       self.client.waited.append(timeout)
@@ -42,6 +43,8 @@ def mqtt_clients(monkeypatch):
       self.waited = []
       self.looping = False
       self.disconnected = False
+      self.subscriptions = []
+      self.rc = 0
       FakeClient.instances.append(self)
 
     def connect(self, host, port, keep_alive):
@@ -57,6 +60,9 @@ def mqtt_clients(monkeypatch):
 
     def disconnect(self):
       self.disconnected = True
+
+    def subscribe(self, topic):
+      self.subscriptions.append(topic)
 
     def publish(self, topic, payload):
       FakeClient.entered.set()
@@ -203,3 +209,388 @@ def test_slow_send_does_not_block_activate_and_keeps_the_latest(mqtt_clients):
   assert wait_for(lambda: len(client.published) == 2)
   assert [p for _, p in client.published] == [payload(1), payload(0)]
   relay.stop()
+
+
+class Clock:
+  def __init__(self):
+    self.value = 0
+
+  def __call__(self):
+    return self.value
+
+
+@pytest.fixture
+def clock(monkeypatch):
+  fake = Clock()
+  monkeypatch.setattr(mqtt_relay, "now", lambda: "2026-11-08T10:00:00Z")
+  return fake
+
+
+def make_relay(clock, config=RELAY):
+  relay = create_output(config, MQTT)
+  relay.clock = clock
+  return relay
+
+
+def decide(relay, value):
+  relay.activate(value)
+  if relay.pending.is_set():
+    relay.pending.clear()
+    relay.send(relay.latest)
+
+
+def report(relay, power, device="0xB5EA", name="stairwell_heater", extra=None):
+  body = {"Device": device, "Name": name, "Power": power, "Endpoint": 1, "LinkQuality": 100}
+  body.update(extra or {})
+  deliver(relay, dumps({"ZbReceived": {name: body}}))
+
+
+def deliver(relay, raw):
+  relay.on_message(None, None, SimpleNamespace(topic="tele/x/stairwell_heater/SENSOR", payload=raw))
+
+
+def sent(mqtt_clients):
+  return [p for client in mqtt_clients.instances for _, p in client.published]
+
+
+def test_the_first_decision_sends(mqtt_clients, clock):
+  relay = make_relay(clock)
+
+  decide(relay, 0)
+
+  assert sent(mqtt_clients) == [payload(0)]
+
+
+def test_an_unchanged_state_is_not_sent_again(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  report(relay, 1)
+
+  for _ in range(5):
+    clock.value += 5
+    decide(relay, 1)
+
+  assert sent(mqtt_clients) == [payload(1)]
+
+
+def test_a_changed_state_is_sent(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  report(relay, 1)
+
+  decide(relay, 0)
+
+  assert sent(mqtt_clients) == [payload(1), payload(0)]
+
+
+def test_a_value_that_maps_to_the_same_power_is_not_a_change(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  report(relay, 1)
+
+  decide(relay, 1.0)
+  decide(relay, True)
+
+  assert sent(mqtt_clients) == [payload(1)]
+
+
+def test_a_failed_connection_is_resent_on_the_next_decision(mqtt_clients, clock):
+  mqtt_clients.fail_connect = True
+  relay = make_relay(clock)
+  decide(relay, 1)
+  mqtt_clients.fail_connect = False
+
+  decide(relay, 1)
+
+  assert sent(mqtt_clients) == [payload(1)]
+  assert relay.failing is False
+
+
+def test_a_publish_that_returns_an_error_code_is_resent(mqtt_clients, clock, caplog):
+  relay = make_relay(clock)
+  relay.send(1)
+  report(relay, 1)
+  mqtt_clients.instances[0].rc = 4
+
+  with caplog.at_level(logging.INFO, logger="boiler_relay.outputs.mqtt_relay"):
+    decide(relay, 0)
+    decide(relay, 0)
+  mqtt_clients.instances[0].rc = 0
+  decide(relay, 0)
+  decide(relay, 0)
+
+  assert sent(mqtt_clients) == [payload(1), payload(0), payload(0), payload(0)]
+  assert caplog.text.count("MQTT send failed") == 1
+
+
+def test_a_report_that_differs_from_the_command_is_resent(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  report(relay, 1)
+  decide(relay, 1)
+
+  report(relay, 0)
+  decide(relay, 1)
+  decide(relay, 1)
+
+  assert sent(mqtt_clients) == [payload(1), payload(1)]
+
+
+def test_a_matching_report_confirms_the_command(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+
+  report(relay, 1)
+
+  assert relay.status() == {"confirmed": 1, "confirmed_time": "2026-11-08T10:00:00Z"}
+  assert relay.link_quality == 100
+  clock.value += 3600
+  decide(relay, 1)
+  assert sent(mqtt_clients) == [payload(1)]
+
+
+def test_the_status_is_null_until_the_first_report(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+
+  assert relay.status() == {"confirmed": None, "confirmed_time": None}
+
+
+def test_silence_resends_with_a_growing_delay_up_to_a_cap(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  times = []
+
+  for _ in range(700):
+    clock.value += 1
+    before = len(sent(mqtt_clients))
+    decide(relay, 1)
+    if len(sent(mqtt_clients)) > before:
+      times.append(clock.value)
+
+  gaps = [b - a for a, b in zip([0] + times, times)]
+  assert gaps[:6] == [5, 10, 20, 40, 80, 120]
+  assert set(gaps[5:]) == {mqtt_relay.RETRY_CAP}
+
+
+def test_silence_is_warned_about_once_and_recovery_is_reported(mqtt_clients, clock, caplog):
+  relay = make_relay(clock)
+  decide(relay, 1)
+
+  with caplog.at_level(logging.INFO, logger="boiler_relay.outputs.mqtt_relay"):
+    for _ in range(4):
+      clock.value += 60
+      decide(relay, 1)
+    report(relay, 1)
+
+  assert caplog.text.count("no report from relay") == 1
+  assert "is reporting again" in caplog.text
+
+
+def test_a_report_ends_the_retries(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  clock.value += 6
+  decide(relay, 1)
+  report(relay, 1)
+
+  clock.value += 1000
+  decide(relay, 1)
+
+  assert sent(mqtt_clients) == [payload(1), payload(1)]
+
+
+def test_a_new_command_restarts_the_backoff(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  for _ in range(3):
+    clock.value += 200
+    decide(relay, 1)
+
+  decide(relay, 0)
+  clock.value += 4
+  decide(relay, 0)
+  assert sent(mqtt_clients)[-1] == payload(0)
+  count = len(sent(mqtt_clients))
+  clock.value += 2
+  decide(relay, 0)
+
+  assert len(sent(mqtt_clients)) == count + 1
+
+
+def test_a_report_for_another_device_is_ignored(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+
+  report(relay, 0, device="0x1234", name="other")
+  report(relay, 1, device="0x1234", name="other")
+
+  assert relay.status() == {"confirmed": None, "confirmed_time": None}
+  clock.value += 6
+  decide(relay, 1)
+  assert sent(mqtt_clients) == [payload(1), payload(1)]
+
+
+def test_the_device_is_matched_whatever_its_case(mqtt_clients, clock):
+  relay = make_relay(clock, {**RELAY, "device": "0xb5ea"})
+  decide(relay, 1)
+
+  report(relay, 1, device="0xB5EA")
+
+  assert relay.status()["confirmed"] == 1
+
+
+@pytest.mark.parametrize("raw", [
+  b"",
+  b"not json",
+  b"\xff\xfe",
+  b"[]",
+  b"null",
+  b'{"ZbReceived": []}',
+  b'{"ZbReceived": {"a": 1}}',
+  b'{"ZbReceived": {"a": {"Device": "0xB5EA"}}}',
+  b'{"ZbReceived": {"a": {"Device": "0xB5EA", "Power": 2}}}',
+  b'{"ZbReceived": {"a": {"Device": "0xB5EA", "Power": "1"}}}',
+  b'{"ZbReceived": {"a": {"Device": "0xB5EA", "Power": true}}}',
+  b'{"ZbReceived": {"a": {"Device": "0xB5EA", "Power": null}}}',
+  b'{"ZbReceived": {"a": {"Device": "0xB5EA", "LinkQuality": 100}}}',
+  b'{"ZbSend": "Done"}',
+])
+def test_malformed_and_unrelated_payloads_are_ignored(mqtt_clients, clock, raw):
+  relay = make_relay(clock)
+  decide(relay, 1)
+
+  deliver(relay, raw)
+
+  assert relay.status() == {"confirmed": None, "confirmed_time": None}
+  clock.value += 6
+  decide(relay, 1)
+  assert sent(mqtt_clients) == [payload(1), payload(1)]
+
+
+def test_a_report_without_link_quality_still_confirms(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+
+  deliver(relay, dumps({"ZbReceived": {"a": {"Device": "0xB5EA", "Power": 1}}}))
+
+  assert relay.status()["confirmed"] == 1
+  assert relay.link_quality is None
+
+
+def test_the_result_topic_is_not_a_confirmation(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+
+  deliver(relay, dumps({"ZbSend": "Done"}))
+
+  assert relay.status()["confirmed"] is None
+
+
+def test_a_report_before_any_command_does_not_suppress_the_first_send(mqtt_clients, clock):
+  relay = make_relay(clock)
+
+  report(relay, 1)
+  decide(relay, 1)
+
+  assert sent(mqtt_clients) == [payload(1)]
+  assert relay.status()["confirmed"] == 1
+
+
+def test_a_restart_sends_the_shutdown_off_and_then_the_first_decision(mqtt_clients, clock):
+  first = make_relay(clock)
+  decide(first, 1)
+  report(first, 1)
+  first.deactivate(wait=True)
+  second = make_relay(clock)
+
+  decide(second, 0)
+
+  assert sent(mqtt_clients) == [payload(1), payload(0), payload(0)]
+
+
+def test_a_shutdown_off_is_sent_even_when_the_last_command_was_off(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 0)
+  report(relay, 0)
+
+  relay.deactivate(wait=True)
+
+  assert sent(mqtt_clients) == [payload(0), payload(0)]
+
+
+def test_a_queued_off_is_sent_when_the_last_command_was_on(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  report(relay, 1)
+
+  relay.deactivate()
+  relay.pending.clear()
+  relay.send(relay.latest)
+
+  assert sent(mqtt_clients) == [payload(1), payload(0)]
+
+
+def test_the_report_topic_comes_from_the_command_topic(mqtt_clients, clock):
+  relay = make_relay(clock, {**RELAY, "topic": "cmnd/tasmota_E3738F/ZbSend"})
+  relay.send(1)
+
+  relay.on_connect(mqtt_clients.instances[0], None, None, 0, None)
+
+  assert mqtt_clients.instances[0].subscriptions == ["tele/tasmota_E3738F/+/SENSOR"]
+
+
+def test_the_relay_subscribes_again_on_every_connect(mqtt_clients, clock):
+  relay = make_relay(clock)
+  relay.send(1)
+  client = mqtt_clients.instances[0]
+
+  relay.on_connect(client, None, None, 0, None)
+  relay.on_connect(client, None, None, 0, None)
+
+  assert client.subscriptions == ["tele/x/+/SENSOR"] * 2
+
+
+def test_the_client_is_wired_to_the_callbacks(mqtt_clients, clock):
+  relay = make_relay(clock)
+
+  relay.send(1)
+
+  client = mqtt_clients.instances[0]
+  assert client.on_connect == relay.on_connect
+  assert client.on_message == relay.on_message
+
+
+def test_a_refused_connection_does_not_subscribe(mqtt_clients, clock):
+  relay = make_relay(clock)
+  relay.send(1)
+  refused = SimpleNamespace(is_failure=True)
+
+  relay.on_connect(mqtt_clients.instances[0], None, None, refused, None)
+
+  assert mqtt_clients.instances[0].subscriptions == []
+
+
+def test_a_topic_without_a_report_topic_sends_on_change_and_never_retries(mqtt_clients, clock):
+  relay = make_relay(clock, {**RELAY, "topic": "relay/set"})
+  decide(relay, 1)
+
+  relay.on_connect(mqtt_clients.instances[0], None, None, 0, None)
+  clock.value += 10000
+  decide(relay, 1)
+  decide(relay, 0)
+
+  assert mqtt_clients.instances[0].subscriptions == []
+  assert sent(mqtt_clients) == [payload(1), payload(0)]
+
+
+def test_a_noisy_relay_is_sent_at_most_once_per_decision(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+
+  for _ in range(10):
+    report(relay, 0)
+
+  decide(relay, 1)
+
+  assert sent(mqtt_clients) == [payload(1), payload(1)]

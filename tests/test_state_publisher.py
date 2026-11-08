@@ -31,6 +31,22 @@ def test_zone_state_has_no_pid_when_none_is_given(redis_client):
   assert "pid" not in read(redis_client, "heating/shadow/zones/Bedrooms")
 
 
+def test_zone_state_carries_a_null_confirmation_by_default(redis_client):
+  StatePublisher(redis_client, ACTIVE).zone("Bedrooms", "hydronic", 0.25, 1)
+
+  data = read(redis_client, "heating/active/zones/Bedrooms")
+  assert data["confirmed"] is None
+  assert data["confirmed_time"] is None
+
+
+def test_zone_state_carries_the_confirmation_when_given(redis_client):
+  StatePublisher(redis_client, ACTIVE).zone("Stairwell", "electric", 0.5, 1, None, 1, "2026-11-08T10:00:00Z")
+
+  data = read(redis_client, "heating/active/zones/Stairwell")
+  assert data["confirmed"] == 1
+  assert data["confirmed_time"] == "2026-11-08T10:00:00Z"
+
+
 def test_boiler_and_heartbeat_are_written_under_the_mode_prefix(redis_client):
   publisher = StatePublisher(redis_client, ACTIVE)
 

@@ -4,7 +4,7 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 BUILD_INFO = Path(__file__).resolve().parent.parent / "build_info.json"
 UNKNOWN = "unknown"

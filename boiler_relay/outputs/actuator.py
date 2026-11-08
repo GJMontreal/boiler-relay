@@ -17,6 +17,9 @@ class Actuator():
   def stop(self):
     pass
 
+  def status(self):
+    return None
+
   def deactivate(self, wait=False):
     self.activate(0)
 

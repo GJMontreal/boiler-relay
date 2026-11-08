@@ -115,7 +115,8 @@ class Zone(Thread):
 
         target_state = self.read_target_state()
         if target_state is None:
-            self.publisher.zone(self.name, self.system, self.control_value, None, asdict(self.gains))
+            self.publisher.zone(self.name, self.system, self.control_value, None, asdict(self.gains),
+                                **self.confirmation())
             return
 
         state = self.duty_state(target_state)
@@ -126,10 +127,18 @@ class Zone(Thread):
             topic = f'{self.input_path}/heating_cooling_state'
             self.redis.set(topic, state.value)
             self.redis.publish(topic, state.value)
-        self.publisher.zone(self.name, self.system, self.control_value, state.value, asdict(self.gains))
+        self.publisher.zone(self.name, self.system, self.control_value, state.value, asdict(self.gains),
+                            **self.confirmation())
 
         self.record(state)
         self.advance_cycle()
+
+    def confirmation(self):
+        for output in self.outputs:
+            status = output.status()
+            if status is not None:
+                return status
+        return {}
 
     def read_json(self, key):
         message = self.redis.get(key)

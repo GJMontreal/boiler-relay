@@ -25,14 +25,14 @@ The bits circled in red are the ones I've written. The UI is implemented as a [H
 Every zone belongs to one of two systems. The `system` field in the config says which.
 
 - **Hydronic** is the boiler, the pump and the zone valves, driven from the BeagleBone's GPIO. Each valve has an end switch that closes when the valve is open. The boiler thread turns the boiler on when any end switch is closed. This is the only system with feedback, because the end switch confirms the valve moved.
-- **Electric** is the Stairwell radiator behind a Zigbee relay, driven over MQTT. It has no end switch and no state feedback. The zone sends a power value and never learns whether the relay switched. An electric zone never calls the boiler, and the config refuses an `end_switch` on it.
+- **Electric** is the Stairwell radiator behind a Zigbee relay, driven over MQTT. It has no end switch, but the relay reports its own power state. The zone subscribes to those reports, sends a command only when the state changes, and resends when the relay reports a different state or stays silent. An electric zone never calls the boiler, and the config refuses an `end_switch` on it.
 
 ## How a zone works
 Each zone has a temperature sensor, a setpoint and one or more outputs. One thread per zone does the work.
 
 1. A PID loop compares the current temperature to the setpoint and produces a control value between 0 and 1.
 2. The zone turns that value into a duty cycle over a ten minute window. A control value of 0.3 opens the valve for three minutes of each ten. It publishes the result as the zone's `heating_cooling_state`.
-3. The zone then calls each of its outputs with that state. An output is a local GPIO pin or an MQTT relay. MQTT messages go out on a separate thread, so a slow broker never delays the zone.
+3. The zone then calls each of its outputs with that state. An output is a local GPIO pin or an MQTT relay. MQTT messages go out on a separate thread, so a slow broker never delays the zone. An MQTT relay sends the first decision after start, any change, and the tick after a failed publish. It resends when the relay reports a power that differs from the last command, and when no report arrives within 5 seconds, then 10, 20 and so on up to 120 seconds. The relay's reports arrive on `tele/<gateway>/+/SENSOR`, derived from the command topic `cmnd/<gateway>/ZbSend`, and are matched on the `Device` field. A command topic of another shape sends on change only.
 4. For hydronic zones, the boiler thread reads the end switch on each zone valve. It turns the boiler and pump on when any valve is open.
 
 A boost flag in redis forces a zone open regardless of the PID output. Gpio outputs can be configured active low per zone.
@@ -55,7 +55,7 @@ Each service also publishes its decisions as JSON with a `time` field. `<mode>` 
 
 | Key | Written by | Value |
 | --- | --- | --- |
-| `heating/<mode>/zones/<zone name>` | zone | `system`, `control_value`, `state` (0, 1 or null before the zone has a target state), `pid` (`kp`, `ki`, `kd`, `integral_cap`, the gains the zone runs) and `time` |
+| `heating/<mode>/zones/<zone name>` | zone | `system`, `control_value`, `state` (0, 1 or null before the zone has a target state), `pid` (`kp`, `ki`, `kd`, `integral_cap`, the gains the zone runs), `confirmed` (the relay's last reported power, 0 or 1, null for a hydronic zone, in shadow mode and before the first report), `confirmed_time` (UTC ISO 8601 with a Z suffix, or null) and `time` |
 | `heating/<mode>/hydronic/boiler` | boiler thread | `call` (0 or 1) and `time`. The shadow service derives the call from its zones' decisions, because it reads no pin |
 | `heating/<mode>/heartbeat` | boiler thread | `time`, once per poll |
 

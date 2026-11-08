@@ -2,7 +2,7 @@
 
 Build order is fixed: hardening and config (done), deploy and shadow. The API and web interface now live in the heating-web repo, with their own TODO.md.
 
-The project controls two systems, set per zone by the `system` field. Hydronic is the boiler, pump and zone valves on GPIO, with an end switch on each valve. Electric is the Stairwell radiator behind a Zigbee relay over MQTT, with no end switch and no state feedback. Published state lives under `heating/<mode>/`: `zones/<zone name>` carries the zone's `system`, and `hydronic/boiler` carries the boiler call.
+The project controls two systems, set per zone by the `system` field. Hydronic is the boiler, pump and zone valves on GPIO, with an end switch on each valve. Electric is the Stairwell radiator behind a Zigbee relay over MQTT, with no end switch. The relay reports its own power state. Published state lives under `heating/<mode>/`: `zones/<zone name>` carries the zone's `system`, and `hydronic/boiler` carries the boiler call.
 
 ## Step 2: deploy, switch and shadow
 
@@ -28,6 +28,7 @@ The project controls two systems, set per zone by the `system` field. Hydronic i
 ## Backlog
 
 - [ ] Boiler short-cycling protection (a minimum on and off time). Deferred until the problem shows.
+- [ ] Check on the device that the relay confirmation works: the subscription, the `confirmed` fields and the silence retries. It has only run against a fake client.
 - [ ] Publish a real MQTT message from `MQTTRelay` with the real topic and device and check the Zigbee relay switches. Publishing to a broker already passes.
 - [ ] Revisit sending relay commands through redis and the bridge, which would drop paho from the control process. Not now, because the radiator would then depend on the bridge to switch.
 - [ ] Homebridge needs a stairwell thermostat that writes `/home/sensors/stairwell/target_temperature` and `target_heatingcooling_state`. Until it does, the Stairwell zone idles.
