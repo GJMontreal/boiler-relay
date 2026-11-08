@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from dataclasses import replace
 from json import load as json_load
 from math import isfinite
+from unicodedata import category
 
 
 class ConfigError(Exception):
@@ -128,7 +129,19 @@ class ShadowConfig(Config):
       except ConfigError as error:
         raise ConfigError(f"shadow: {error}")
 
-SECTIONS = {"redis", "boiler", "zones", "mqtt", "shadow", "pid"}
+SITE_NAME_LIMIT = 60
+SECTIONS = {"redis", "boiler", "zones", "mqtt", "shadow", "pid", "site_name"}
+
+def check_site_name(value):
+  if not isinstance(value, str):
+    raise ConfigError(f"site_name must be a string, found {value!r}")
+  if not value.strip():
+    raise ConfigError("site_name must not be empty")
+  if len(value) > SITE_NAME_LIMIT:
+    raise ConfigError(f"site_name must be at most {SITE_NAME_LIMIT} characters, found {len(value)}")
+  if any(category(character) == "Cc" for character in value):
+    raise ConfigError("site_name must not contain control characters")
+  return value
 
 @dataclass
 class SystemConfig(Config):
@@ -138,6 +151,7 @@ class SystemConfig(Config):
   mqtt: MQTTConfig = None
   shadow: ShadowConfig = None
   pid: PIDConfig = None
+  site_name: str = None
 
   @classmethod
   def from_dict(cls, data: dict) -> SystemConfig:
@@ -153,10 +167,11 @@ class SystemConfig(Config):
     mqtt = cls.build("mqtt", MQTTConfig, data["mqtt"]) if "mqtt" in data else None
     pid = cls.build_default_pid(data["pid"]) if "pid" in data else None
     zones = [cls.build_zone(index, entry, pid) for index, entry in enumerate(data["zones"])]
+    site_name = check_site_name(data["site_name"]) if "site_name" in data else None
 
     shadow = cls.build("shadow", ShadowConfig, data["shadow"]) if "shadow" in data else None
 
-    config = cls(redis=redis, boiler=boiler, zones=zones, mqtt=mqtt, shadow=shadow, pid=pid)
+    config = cls(redis=redis, boiler=boiler, zones=zones, mqtt=mqtt, shadow=shadow, pid=pid, site_name=site_name)
     config.validate()
     return config
 

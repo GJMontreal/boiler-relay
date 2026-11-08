@@ -27,6 +27,7 @@ The project controls two systems, set per zone by the `system` field. Hydronic i
 
 ## Backlog
 
+- [x] Accept an optional top-level `site_name` in the config for the web interface title. The controller validates it and ignores it. The real name stays in a device-only file.
 - [ ] Boiler short-cycling protection (a minimum on and off time). Deferred until the problem shows.
 - [ ] Check on the device that the relay confirmation works: the subscription, the `confirmed` fields, the silence retries and the refresh. The relay reported every repeated command at the 5 second cadence on 2026-11-08, 17 of 17. Watch one 60 second refresh on the device and check that `confirmed_silent` stays false. The code has only run against a fake client.
 - [ ] Publish a real MQTT message from `MQTTRelay` with the real topic and device and check the Zigbee relay switches. Publishing to a broker already passes.

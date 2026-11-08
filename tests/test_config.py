@@ -511,3 +511,48 @@ def test_shipped_config_marks_only_the_stairwell_electric():
   config = SystemConfig.from_file(CONFIG_PATH)
 
   assert [z.name for z in config.zones if z.system == "electric"] == ["Stairwell"]
+
+
+def test_site_name_is_optional():
+  assert SystemConfig.from_dict(SYSTEM).site_name is None
+
+
+def test_site_name_is_read_from_the_config():
+  assert SystemConfig.from_dict(system(site_name="Example Site")).site_name == "Example Site"
+
+
+@pytest.mark.parametrize("name", ["Example Site", "x", "x" * 60, "Café Ünïcode", "  padded  "])
+def test_site_name_accepts_a_printable_string(name):
+  assert SystemConfig.from_dict(system(site_name=name)).site_name == name
+
+
+@pytest.mark.parametrize("name", ["", " ", "   ", "x" * 61, "a\tb", "a\nb", "a\x00b", "a\x7fb", "a\x85b", "\n"])
+def test_site_name_rejects_a_blank_long_or_control_string(name):
+  with pytest.raises(ConfigError) as error:
+    SystemConfig.from_dict(system(site_name=name))
+
+  assert str(error.value).startswith("site_name")
+
+
+@pytest.mark.parametrize("name", [None, 5, 1.5, True, ["Example Site"], {"a": "b"}])
+def test_site_name_must_be_a_string(name):
+  with pytest.raises(ConfigError) as error:
+    SystemConfig.from_dict(system(site_name=name))
+
+  assert str(error.value).startswith("site_name must be a string")
+
+
+def test_an_unknown_top_level_section_is_still_refused():
+  with pytest.raises(ConfigError, match="unknown config sections"):
+    SystemConfig.from_dict(system(site_title="Example Site"))
+
+
+def test_a_config_without_site_name_loads_as_before():
+  config = SystemConfig.from_dict(SYSTEM)
+
+  assert config.site_name is None
+  assert [z.name for z in config.zones] == ["Bedrooms"]
+
+
+def test_the_shipped_config_names_the_site_generically():
+  assert SystemConfig.from_file(CONFIG_PATH).site_name == "Heating"

@@ -1,4 +1,5 @@
 {
+    "site_name": "Heating",
     "mqtt": {
         "host": "localhost",
         "port": 1883,
