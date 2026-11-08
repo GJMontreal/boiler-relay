@@ -54,6 +54,8 @@ def create_zones(file_path):
     zones = []
     with open(file_path) as json_file:
         data = json.load(json_file)
+        for gpio in data.get('inputs', []):
+            GPIO.setup(gpio, GPIO.IN)
         for entry in data['zones']:
             zone = Zone(ZoneConfig(entry))
             zones.append(zone)
