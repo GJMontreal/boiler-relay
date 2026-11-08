@@ -204,7 +204,7 @@ def test_the_shipped_config_runs_candidate_gains_in_the_shadow_only():
   today = PIDConfig(kp=1, ki=0.01, kd=0.5, integral_cap=1.0)
 
   assert config.shadow.pid == PIDConfig(**SHADOW_PID)
-  assert all(zone.pid == today for zone in config.zones_for(False))
+  assert all(zone.pid == today for zone in config.zones_for(False) if zone.name != "Study")
   assert all(zone.pid == PIDConfig(**SHADOW_PID) for zone in config.zones_for(True) if zone.system == "hydronic")
   assert all(zone.pid == today for zone in config.zones_for(True) if zone.system == "electric")
 
@@ -288,7 +288,8 @@ def test_the_shipped_config_writes_the_live_gains_out_explicitly():
 
   assert data["pid"] == {"kp": 1, "ki": 0.01, "kd": 0.5, "integral_cap": 1.0}
   assert config.pid == TODAY
-  assert all(pid == TODAY for pid in effective(config, False).values())
+  assert all(pid == TODAY for name, pid in effective(config, False).items() if name != "Study")
+  assert effective(config, False)["Study"] == PIDConfig(**SHADOW_PID)
   hydronic = {zone.name for zone in config.zones if zone.system == "hydronic"}
   shadow = effective(config, True)
   assert all(shadow[name] == PIDConfig(**SHADOW_PID) for name in hydronic)

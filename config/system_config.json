@@ -36,6 +36,7 @@
             "sensor_path": "/home/sensors/front_room",
             "name": "Study",
             "system": "hydronic",
+            "pid": {"kp": 1, "ki": 0.001, "kd": 0, "integral_cap": 0.3},
             "outputs": [
                 {"type": "gpio", "pin": "P8_12", "end_switch": "P8_11"}
             ],
