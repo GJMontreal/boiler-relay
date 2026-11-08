@@ -20,6 +20,7 @@ The project controls two systems, set per zone by the `system` field. Hydronic i
 - [x] First deploy at the house during heating season. Watch each zone open and close once and check the boiler follows the end switches. Roll back with `switch.sh legacy`.
 - [x] Install `paho-mqtt` 2.x, `simple-pid` and `redis==3.5.3` on the device's Python 3.7 in the new venv.
 - [x] Add a per-zone `pid` block with an integral cap, our own PID class, a shadow-only profile and the profile published in each zone's state, so the shadow can run candidate gains.
+- [x] Harden the v2 and shadow units for boot: order after `redis-server` and `mosquitto`, restart after 5 seconds and never hit the start limit. `switch.sh v2` leaves the shadow running.
 - [ ] Compare the shadow's candidate gains with the legacy controller on the Compare page over a few heating cycles, then decide the gains for v2.
 - [ ] Replace the BackRoom end switch (`P8_27`). It stayed high for about 10 minutes after the output turned off on 2026-11-07, and a BackRoom call can keep the boiler on with no demand until then.
 

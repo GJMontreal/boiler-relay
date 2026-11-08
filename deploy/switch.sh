@@ -29,7 +29,7 @@ WAIT_SECONDS=30
 
 case "${TARGET}" in
     legacy) STOP=("${V2}" "${SHADOW}"); START=("${LEGACY}"); ENABLE=("${LEGACY}"); DISABLE=("${V2}" "${SHADOW}") ;;
-    v2) STOP=("${LEGACY}" "${SHADOW}"); START=("${V2}"); ENABLE=("${V2}"); DISABLE=("${LEGACY}" "${SHADOW}") ;;
+    v2) STOP=("${LEGACY}"); START=("${V2}"); ENABLE=("${V2}"); DISABLE=("${LEGACY}") ;;
     shadow) STOP=("${V2}"); START=("${LEGACY}" "${SHADOW}"); ENABLE=("${LEGACY}" "${SHADOW}"); DISABLE=("${V2}") ;;
     *)
         echo "${USAGE}"

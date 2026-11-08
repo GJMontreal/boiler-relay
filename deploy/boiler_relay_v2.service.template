@@ -1,7 +1,8 @@
 [Unit]
 Description=Heating Zone and Boiler Control
-After=redis.service
+After=redis-server.service mosquitto.service
 Conflicts=boiler_relay.service
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -9,6 +10,7 @@ User=<service_user>
 WorkingDirectory=/var/lib/<service_name>
 ExecStart=/var/lib/<service_name>/.venv/bin/python -m boiler_relay
 Restart=on-failure
+RestartSec=5
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONPATH=/var/lib/<service_name>
 

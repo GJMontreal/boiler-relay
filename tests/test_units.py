@@ -66,11 +66,22 @@ def test_the_shadow_unit_cannot_enable_or_pull_in_v2():
     assert not unit.has_option("Unit", key)
 
 
-def test_the_shadow_unit_starts_after_redis_and_the_broker():
-  after = read_unit("boiler_relay_v2_shadow.service.template")["Unit"]["After"].split()
+@pytest.mark.parametrize("name", ["boiler_relay_v2.service.template", "boiler_relay_v2_shadow.service.template"])
+def test_both_units_start_after_redis_and_the_broker(name):
+  after = read_unit(name)["Unit"]["After"].split()
 
   assert "redis-server.service" in after
   assert "mosquitto.service" in after
+
+
+@pytest.mark.parametrize("name", ["boiler_relay_v2.service.template", "boiler_relay_v2_shadow.service.template"])
+def test_both_units_retry_slowly_and_never_give_up(name):
+  unit = read_unit(name)
+
+  assert unit["Service"]["Restart"] == "on-failure"
+  assert unit["Service"]["RestartSec"] == "5"
+  assert unit["Unit"]["StartLimitIntervalSec"] == "0"
+  assert not unit.has_option("Service", "StartLimitIntervalSec")
 
 
 def test_v2_conflicts_with_legacy_only_and_the_shadow_conflicts_with_nothing():
@@ -98,18 +109,26 @@ def test_switching_to_shadow_enables_the_shadow_and_never_v2(switch):
   ]
 
 
-def test_switching_to_v2_disables_the_shadow(switch):
+def test_switching_to_v2_stops_and_disables_only_legacy(switch):
   result, changes = switch("v2", "--confirm")
 
   assert result.returncode == 0, result.stderr
   assert changes == [
     "stop boiler_relay",
-    "stop boiler_relay_v2_shadow",
     "start boiler_relay_v2",
     "enable boiler_relay_v2",
     "disable boiler_relay",
-    "disable boiler_relay_v2_shadow",
   ]
+
+
+def test_switching_to_v2_leaves_a_running_shadow_alone(switch, tmp_path):
+  (tmp_path / "state" / "active").write_text("boiler_relay\nboiler_relay_v2_shadow\n")
+
+  result, changes = switch("v2", "--confirm")
+
+  assert result.returncode == 0, result.stderr
+  assert not any("boiler_relay_v2_shadow" in change for change in changes)
+  assert (tmp_path / "state" / "active").read_text().split() == ["boiler_relay_v2_shadow", "boiler_relay_v2"]
 
 
 def test_switching_to_legacy_disables_the_shadow(switch):
@@ -131,3 +150,11 @@ def test_switching_to_v2_without_confirm_changes_nothing(switch):
 
   assert result.returncode == 1
   assert changes == []
+
+
+def test_switching_to_v2_lists_only_legacy_as_stopped(switch, tmp_path):
+  (tmp_path / "state" / "active").write_text("boiler_relay\nboiler_relay_v2_shadow\n")
+
+  result, _ = switch("v2")
+
+  assert "switching to v2 will stop: boiler_relay\n" in result.stdout
