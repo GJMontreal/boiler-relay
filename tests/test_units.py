@@ -73,10 +73,10 @@ def test_the_shadow_unit_starts_after_redis_and_the_broker():
   assert "mosquitto.service" in after
 
 
-def test_starting_v2_stops_the_shadow_and_starting_the_shadow_stops_nothing():
+def test_v2_conflicts_with_legacy_only_and_the_shadow_conflicts_with_nothing():
   v2 = read_unit("boiler_relay_v2.service.template")["Unit"]["Conflicts"].split()
 
-  assert "<service_name>_shadow.service" in v2
+  assert v2 == ["boiler_relay.service"]
   assert not read_unit("boiler_relay_v2_shadow.service.template").has_option("Unit", "Conflicts")
 
 

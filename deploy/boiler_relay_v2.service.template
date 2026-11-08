@@ -1,7 +1,7 @@
 [Unit]
 Description=Heating Zone and Boiler Control
 After=redis.service
-Conflicts=boiler_relay.service <service_name>_shadow.service
+Conflicts=boiler_relay.service
 
 [Service]
 Type=simple
