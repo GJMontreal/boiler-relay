@@ -56,6 +56,7 @@ The zone and boiler threads also write state under `heating/<mode>/`, listed und
 - GPIO pin names are BeagleBone headers such as `P8_10`.
 - Tests live in `tests/` and use pytest with fakeredis and a recording GPIO. Run `.venv/bin/python -m pytest`. Loop threads are stopped by a fake `sleep` that raises, see `run_ticks` in `tests/conftest.py`.
 - No linter. Run `python -m boiler_relay` to smoke test with the stub GPIO. It needs a local redis.
+- When another session asked for the work, message that session when the work is finished. Say what was done, the commit hashes, and any tag, push or deploy that did not happen. The message does not replace the user's approval for a push or a tag. Ask the user for those first.
 - CI runs `pytest` on Python 3.7 and 3.11 (`.github/workflows/test.yml`). It has not run yet.
 
 ## Setup
