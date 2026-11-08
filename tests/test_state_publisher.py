@@ -17,6 +17,20 @@ def test_zone_state_is_written_under_the_mode_prefix(redis_client):
   assert data["time"].endswith("Z")
 
 
+def test_zone_state_carries_the_pid_profile_when_given(redis_client):
+  profile = {"kp": 1, "ki": 0.001, "kd": 0, "integral_cap": 0.3}
+
+  StatePublisher(redis_client, SHADOW).zone("Bedrooms", "hydronic", 0.25, 1, profile)
+
+  assert read(redis_client, "heating/shadow/zones/Bedrooms")["pid"] == profile
+
+
+def test_zone_state_has_no_pid_when_none_is_given(redis_client):
+  StatePublisher(redis_client, SHADOW).zone("Bedrooms", "hydronic", 0.25, 1)
+
+  assert "pid" not in read(redis_client, "heating/shadow/zones/Bedrooms")
+
+
 def test_boiler_and_heartbeat_are_written_under_the_mode_prefix(redis_client):
   publisher = StatePublisher(redis_client, ACTIVE)
 

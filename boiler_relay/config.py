@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from dataclasses import replace
 from json import load as json_load
+from math import isfinite
 
 
 class ConfigError(Exception):
@@ -41,11 +43,23 @@ class BoilerConfig(Config):
   def __post_init__(self):
     self.poll_interval = float(self.poll_interval)
 
+def is_number(value):
+  return isinstance(value, (int, float)) and not isinstance(value, bool) and isfinite(value)
+
 @dataclass
 class PIDConfig(Config):
   kp: float = 1.0
   ki: float = 0.01
   kd: float = 0.5
+  integral_cap: float = 1.0
+
+  def __post_init__(self):
+    for field in ("kp", "ki", "kd"):
+      value = getattr(self, field)
+      if not is_number(value) or value < 0:
+        raise ConfigError(f"pid {field} must be a number of zero or more, found {value!r}")
+    if not is_number(self.integral_cap) or not 0 <= self.integral_cap <= 1:
+      raise ConfigError(f"pid integral_cap must be a number from 0 to 1, found {self.integral_cap!r}")
 
 @dataclass
 class ZoneConfig(Config):
@@ -62,7 +76,10 @@ class ZoneConfig(Config):
     self.pid_interval = float(self.pid_interval)
     self.control_interval = float(self.control_interval)
     if not isinstance(self.pid, PIDConfig):
-      self.pid = PIDConfig(**(self.pid or {}))
+      try:
+        self.pid = PIDConfig(**(self.pid or {}))
+      except ConfigError as error:
+        raise ConfigError(f"zone {self.name}: {error}")
     self.validate()
 
   def validate(self):
@@ -94,7 +111,18 @@ class RelayConfig(Config):
   device: str
   topic: str
 
-SECTIONS = {"redis", "boiler", "zones", "mqtt"}
+@dataclass
+class ShadowConfig(Config):
+  pid: PIDConfig
+
+  def __post_init__(self):
+    if not isinstance(self.pid, PIDConfig):
+      try:
+        self.pid = PIDConfig(**(self.pid or {}))
+      except ConfigError as error:
+        raise ConfigError(f"shadow: {error}")
+
+SECTIONS = {"redis", "boiler", "zones", "mqtt", "shadow"}
 
 @dataclass
 class SystemConfig(Config):
@@ -102,6 +130,7 @@ class SystemConfig(Config):
   boiler: BoilerConfig
   zones: list[ZoneConfig]
   mqtt: MQTTConfig = None
+  shadow: ShadowConfig = None
 
   @classmethod
   def from_dict(cls, data: dict) -> SystemConfig:
@@ -118,7 +147,9 @@ class SystemConfig(Config):
     zones = [cls.build(f"zone {entry.get('name', index)}", ZoneConfig, entry)
              for index, entry in enumerate(data["zones"])]
 
-    config = cls(redis=redis, boiler=boiler, zones=zones, mqtt=mqtt)
+    shadow = cls.build("shadow", ShadowConfig, data["shadow"]) if "shadow" in data else None
+
+    config = cls(redis=redis, boiler=boiler, zones=zones, mqtt=mqtt, shadow=shadow)
     config.validate()
     return config
 
@@ -163,3 +194,8 @@ class SystemConfig(Config):
   @property
   def end_switches(self) -> list[str]:
     return [pin for zone in self.zones if zone.system == HYDRONIC for pin in zone.end_switches]
+
+  def zones_for(self, shadow) -> list[ZoneConfig]:
+    if not shadow or self.shadow is None:
+      return self.zones
+    return [replace(zone, pid=self.shadow.pid) if zone.system == HYDRONIC else zone for zone in self.zones]

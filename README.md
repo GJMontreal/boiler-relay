@@ -55,14 +55,20 @@ Each service also publishes its decisions as JSON with a `time` field. `<mode>` 
 
 | Key | Written by | Value |
 | --- | --- | --- |
-| `heating/<mode>/zones/<zone name>` | zone | `system`, `control_value`, `state` (0, 1 or null before the zone has a target state) and `time` |
+| `heating/<mode>/zones/<zone name>` | zone | `system`, `control_value`, `state` (0, 1 or null before the zone has a target state), `pid` (`kp`, `ki`, `kd`, `integral_cap`, the gains the zone runs) and `time` |
 | `heating/<mode>/hydronic/boiler` | boiler thread | `call` (0 or 1) and `time`. The shadow service derives the call from its zones' decisions, because it reads no pin |
 | `heating/<mode>/heartbeat` | boiler thread | `time`, once per poll |
 
 The read-only API and web interface live in the `heating-web` repo. It is deployed and versioned apart from this service, and it reads these keys. It also reads this project's `config/system_config.json` for each zone's name, sensor path and system.
 
 ## Configuration
-Zones, the boiler output and the redis and MQTT endpoints are described in JSON. `config/system_config.json` is the default config file. A zone is one sensor, one PID and one kind of output: local GPIO pins or an MQTT relay. Each zone names its `system`, `hydronic` or `electric`. A gpio output on a hydronic zone may name an `end_switch` pin, and the boiler follows all of them. The config needs at least one hydronic zone with an `end_switch`. A zone can also set `control_interval` (the duty window in minutes) and `pid` gains. The program refuses to start on a config it cannot use, and says why.
+Zones, the boiler output and the redis and MQTT endpoints are described in JSON. `config/system_config.json` is the default config file. A zone is one sensor, one PID and one kind of output: local GPIO pins or an MQTT relay. Each zone names its `system`, `hydronic` or `electric`. A gpio output on a hydronic zone may name an `end_switch` pin, and the boiler follows all of them. The config needs at least one hydronic zone with an `end_switch`. A zone can also set `control_interval` (the duty window in minutes) and a `pid` block. The program refuses to start on a config it cannot use, and says why.
+
+The `pid` block holds `kp`, `ki`, `kd` and `integral_cap`. The defaults are 1, 0.01, 0.5 and 1.0. The gains are numbers of zero or more, and the cap is a number from 0 to 1. The controller is `boiler_relay/pid.py`. It takes the proportional term on the error and the derivative on the measurement, clamps the integral to 0 up to the cap, and clamps the output to 0 to 1. With the defaults it gives the same output as `simple-pid` 2.0.1, which an equality test checks sample for sample.
+
+The integral cap exists because the plant is slow. With the integral clamped only by the output limit, a zone that has called for heat for hours holds full output until the temperature passes the target. A cap of 0.3 lets the proportional term ease the output earlier.
+
+An optional top-level `shadow` section holds a `pid` block. In shadow mode it replaces the `pid` of every hydronic zone. Electric zones and the active service keep their own. The shipped config sets the shadow to Kp 1, Ki 0.001, Kd 0 and a cap of 0.3, so the shadow runs candidate gains while the legacy controller keeps its own.
 
 The end switch pairing is verified on the device for all five valves, by boost tests read through sysfs on 2026-11-07.
 

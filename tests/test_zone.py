@@ -141,7 +141,13 @@ def test_zone_without_outputs_has_none(redis_client, gpio):
 def test_pid_gains_come_from_the_zone_config(redis_client, gpio):
   zone = make_zone(pid={"kp": 2, "ki": 0.5, "kd": 0.25})
 
-  assert zone.pid.tunings == (2, 0.5, 0.25)
+  assert (zone.pid.kp, zone.pid.ki, zone.pid.kd) == (2, 0.5, 0.25)
+  assert zone.pid.integral_cap == 1.0
+  assert zone.pid.sample_time == 10.0
+
+
+def test_the_integral_cap_comes_from_the_zone_config(redis_client, gpio):
+  assert make_zone(pid={"integral_cap": 0.3}).pid.integral_cap == 0.3
 
 
 def test_duty_window_comes_from_control_interval(redis_client, gpio):
@@ -590,6 +596,25 @@ def test_a_shadow_zone_publishes_a_null_state_before_the_target_state_exists(red
 
   data = json.loads(redis_client.get("heating/shadow/zones/Bedrooms"))
   assert data["state"] is None
+
+
+def test_a_zone_publishes_the_pid_profile_it_runs(redis_client, gpio, run_ticks):
+  seed(redis_client, current=18, target=21, state=1)
+  zone = make_shadow_zone(1.0, pid={"kp": 1, "ki": 0.001, "kd": 0, "integral_cap": 0.3})
+
+  run_ticks(zone, 1)
+
+  data = json.loads(redis_client.get("heating/shadow/zones/Bedrooms"))
+  assert data["pid"] == {"kp": 1, "ki": 0.001, "kd": 0, "integral_cap": 0.3}
+
+
+def test_a_zone_publishes_its_pid_profile_before_the_target_state_exists(redis_client, gpio, run_ticks):
+  seed(redis_client, current=18, target=21)
+
+  run_ticks(make_shadow_zone(1.0), 1)
+
+  data = json.loads(redis_client.get("heating/shadow/zones/Bedrooms"))
+  assert data["pid"] == {"kp": 1, "ki": 0.01, "kd": 0.5, "integral_cap": 1.0}
 
 
 def test_an_active_zone_also_publishes_under_the_active_prefix(redis_client, gpio, run_ticks):

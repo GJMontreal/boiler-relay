@@ -79,5 +79,8 @@
     "boiler": {
         "output_gpio": "P8_18",
         "poll_interval": 5
+    },
+    "shadow": {
+        "pid": {"kp": 1, "ki": 0.001, "kd": 0, "integral_cap": 0.3}
     }
 }

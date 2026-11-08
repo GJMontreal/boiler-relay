@@ -23,8 +23,11 @@ class StatePublisher:
         self.redis = redis
         self.prefix = f"heating/{mode}"
 
-    def zone(self, name, system, control_value, state):
-        self.write(f"zones/{name}", {"system": system, "control_value": control_value, "state": state})
+    def zone(self, name, system, control_value, state, pid=None):
+        payload = {"system": system, "control_value": control_value, "state": state}
+        if pid is not None:
+            payload["pid"] = pid
+        self.write(f"zones/{name}", payload)
 
     def boiler(self, call):
         self.write("hydronic/boiler", {"call": call})

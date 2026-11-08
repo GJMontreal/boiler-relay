@@ -73,7 +73,7 @@ def test_boiler_config_converts_poll_interval():
 
 
 def test_pid_defaults_match_the_tuned_values():
-  assert PIDConfig() == PIDConfig(kp=1, ki=0.01, kd=0.5)
+  assert PIDConfig() == PIDConfig(kp=1, ki=0.01, kd=0.5, integral_cap=1.0)
 
 
 def test_zone_config_accepts_the_config_shape():
@@ -105,9 +105,108 @@ def test_zone_config_reads_pid_gains():
   assert config.pid == PIDConfig(kp=2, ki=0.1, kd=0.5)
 
 
+def test_zone_config_reads_the_integral_cap():
+  assert ZoneConfig(**zone(pid={"integral_cap": 0.3})).pid.integral_cap == 0.3
+
+
+@pytest.mark.parametrize("pid", [
+  {"kp": -1},
+  {"ki": -0.01},
+  {"kd": -0.5},
+  {"kp": "1"},
+  {"ki": True},
+  {"kd": None},
+  {"kp": float("nan")},
+  {"ki": float("inf")},
+  {"integral_cap": 1.5},
+  {"integral_cap": -0.1},
+  {"integral_cap": "0.3"},
+  {"integral_cap": float("nan")},
+])
+def test_zone_config_rejects_nonsense_pid_values(pid):
+  with pytest.raises(ConfigError, match="zone Bedrooms: pid"):
+    ZoneConfig(**zone(pid=pid))
+
+
+@pytest.mark.parametrize("pid", [
+  {"kp": 0, "ki": 0, "kd": 0},
+  {"integral_cap": 0},
+  {"integral_cap": 1},
+])
+def test_zone_config_accepts_the_edges_of_the_pid_ranges(pid):
+  ZoneConfig(**zone(pid=pid))
+
+
 def test_zone_config_rejects_unknown_pid_keys():
   with pytest.raises(TypeError):
     ZoneConfig(**zone(pid={"kq": 2}))
+
+
+SHADOW_PID = {"kp": 1, "ki": 0.001, "kd": 0, "integral_cap": 0.3}
+ELECTRIC_ZONE = {
+  "sensor_path": "/home/sensors/b",
+  "name": "Stairwell",
+  "system": "electric",
+  "outputs": [RELAY],
+  "pid_interval": "10",
+}
+
+
+def test_a_config_without_a_shadow_section_gives_every_zone_its_own_pid():
+  config = SystemConfig.from_dict(system())
+
+  assert config.shadow is None
+  assert config.zones_for(True) == config.zones
+  assert config.zones_for(False) == config.zones
+
+
+def test_the_shadow_pid_replaces_the_pid_of_every_hydronic_zone_in_shadow_mode():
+  config = SystemConfig.from_dict(system(zones=[ZONE, ELECTRIC_ZONE], shadow={"pid": SHADOW_PID}))
+
+  hydronic, electric = config.zones_for(True)
+
+  assert hydronic.pid == PIDConfig(**SHADOW_PID)
+  assert electric.pid == PIDConfig()
+  assert hydronic.name == "Bedrooms"
+
+
+def test_the_shadow_pid_leaves_active_mode_alone():
+  config = SystemConfig.from_dict(system(shadow={"pid": SHADOW_PID}))
+
+  assert config.zones_for(False)[0].pid == PIDConfig()
+  assert config.zones[0].pid == PIDConfig()
+
+
+def test_the_shadow_pid_overrides_a_zone_pid_in_shadow_mode_only():
+  config = SystemConfig.from_dict(system(zones=[zone(pid={"kp": 3})], shadow={"pid": SHADOW_PID}))
+
+  assert config.zones_for(True)[0].pid == PIDConfig(**SHADOW_PID)
+  assert config.zones_for(False)[0].pid == PIDConfig(kp=3)
+
+
+def test_the_shadow_section_needs_a_pid():
+  with pytest.raises(ConfigError, match="shadow"):
+    SystemConfig.from_dict(system(shadow={}))
+
+
+def test_the_shadow_section_rejects_unknown_keys():
+  with pytest.raises(ConfigError, match="shadow"):
+    SystemConfig.from_dict(system(shadow={"pid": SHADOW_PID, "mode": "x"}))
+
+
+def test_the_shadow_pid_is_validated():
+  with pytest.raises(ConfigError, match="shadow: pid integral_cap"):
+    SystemConfig.from_dict(system(shadow={"pid": {"integral_cap": 2}}))
+
+
+def test_the_shipped_config_runs_candidate_gains_in_the_shadow_only():
+  config = SystemConfig.from_file(CONFIG_PATH)
+  today = PIDConfig(kp=1, ki=0.01, kd=0.5, integral_cap=1.0)
+
+  assert config.shadow.pid == PIDConfig(**SHADOW_PID)
+  assert all(zone.pid == today for zone in config.zones_for(False))
+  assert all(zone.pid == PIDConfig(**SHADOW_PID) for zone in config.zones_for(True) if zone.system == "hydronic")
+  assert all(zone.pid == today for zone in config.zones_for(True) if zone.system == "electric")
 
 
 def test_zone_config_derives_control_path():

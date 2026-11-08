@@ -1,5 +1,5 @@
 pytest
 fakeredis
 redis
-simple-pid
+simple-pid==2.0.1
 paho-mqtt>=2.0

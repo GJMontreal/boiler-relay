@@ -45,6 +45,7 @@ def fakes(monkeypatch, redis_server):
 
   def make_zone(zone_config, redis_config, mqtt_config, mode="active"):
     zone = FakeThread(zone_config.name)
+    zone.config = zone_config
     zone.mode = mode
     created.zones.append(zone)
     return zone
@@ -121,6 +122,19 @@ def test_build_in_shadow_mode_makes_a_boiler_that_follows_the_zones(fakes):
   assert boiler.zones == zones
   assert boiler.publisher.prefix == "heating/shadow"
   assert not hasattr(boiler, "end_switches")
+
+
+def test_build_gives_shadow_zones_the_shadow_pid_and_active_zones_their_own(fakes):
+  shadow_pid = {"kp": 1, "ki": 0.001, "kd": 0, "integral_cap": 0.3}
+  system = SystemConfig.from_dict({**VALID, "shadow": {"pid": shadow_pid}})
+
+  active, _ = entry.build(system, shadow=False)
+  shadow, _ = entry.build(system, shadow=True)
+
+  assert active[0].config.pid.ki == 0.01
+  assert active[0].config.pid.integral_cap == 1.0
+  assert shadow[0].config.pid.ki == 0.001
+  assert shadow[0].config.pid.integral_cap == 0.3
 
 
 def test_supervise_returns_zero_when_asked_to_stop():

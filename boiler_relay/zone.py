@@ -1,14 +1,15 @@
 import logging
+from dataclasses import asdict
 from datetime import datetime, timezone
 from json import loads
 from threading import Event, Thread
 from time import monotonic, sleep
 
 from redis import Redis
-from simple_pid import PID
 
 from boiler_relay.heating_cooling_state import HeatingCoolingState
 from boiler_relay.outputs import create_output
+from boiler_relay.pid import PID
 from boiler_relay.state_publisher import ACTIVE, SHADOW, StatePublisher
 
 log = logging.getLogger(__name__)
@@ -29,11 +30,10 @@ class Zone(Thread):
         self.system = zone_config.system
         self.has_end_switch = bool(zone_config.end_switches)
 
-        gains = zone_config.pid
-        self.pid = PID(gains.kp, gains.ki, gains.kd,
-                       setpoint=0,
-                       sample_time=zone_config.pid_interval,
-                       output_limits=(0, 1))
+        self.gains = zone_config.pid
+        self.pid = PID(self.gains.kp, self.gains.ki, self.gains.kd,
+                       integral_cap=self.gains.integral_cap,
+                       sample_time=zone_config.pid_interval)
 
         self.interval = 5
         self.cycle = 0
@@ -115,7 +115,7 @@ class Zone(Thread):
 
         target_state = self.read_target_state()
         if target_state is None:
-            self.publisher.zone(self.name, self.system, self.control_value, None)
+            self.publisher.zone(self.name, self.system, self.control_value, None, asdict(self.gains))
             return
 
         state = self.duty_state(target_state)
@@ -126,7 +126,7 @@ class Zone(Thread):
             topic = f'{self.input_path}/heating_cooling_state'
             self.redis.set(topic, state.value)
             self.redis.publish(topic, state.value)
-        self.publisher.zone(self.name, self.system, self.control_value, state.value)
+        self.publisher.zone(self.name, self.system, self.control_value, state.value, asdict(self.gains))
 
         self.record(state)
         self.advance_cycle()

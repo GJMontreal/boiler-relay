@@ -28,7 +28,7 @@ def parse_arguments(argv=None):
 
 def build(system, shadow=False):
   mode = SHADOW if shadow else ACTIVE
-  zones = [Zone(zone, system.redis, system.mqtt, mode=mode) for zone in system.zones]
+  zones = [Zone(zone, system.redis, system.mqtt, mode=mode) for zone in system.zones_for(shadow)]
   publisher = StatePublisher(Redis(host=system.redis.host, port=system.redis.port, db=0), mode)
   if shadow:
     boiler = ShadowBoilerThread(system.boiler, zones, publisher)
