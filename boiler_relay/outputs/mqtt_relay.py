@@ -14,6 +14,7 @@ log = logging.getLogger(__name__)
 SEND_TIMEOUT = 2
 CONFIRM_TIMEOUT = 5
 RETRY_CAP = 120
+REFRESH_INTERVAL = 60
 
 
 def report_topic(command_topic):
@@ -66,6 +67,7 @@ class MQTTRelay(Actuator):
     self.awaiting = False
     self.mismatch = False
     self.silent = False
+    self.unconfirmed_since = None
     self.confirmed = None
     self.confirmed_time = None
     self.link_quality = None
@@ -97,7 +99,7 @@ class MQTTRelay(Actuator):
     if self.last_sent is None or self.failing or self.mismatch or power != self.last_sent:
       return True
     if not self.awaiting:
-      return False
+      return self.clock() - self.sent_at >= REFRESH_INTERVAL
     waited = self.clock() - self.sent_at
     if waited < self.retry_delay():
       return False
@@ -112,7 +114,10 @@ class MQTTRelay(Actuator):
 
   def status(self):
     with self.lock:
-      return {"confirmed": self.confirmed, "confirmed_time": self.confirmed_time}
+      silent = (self.unconfirmed_since is not None
+                and self.clock() - self.unconfirmed_since >= CONFIRM_TIMEOUT)
+      return {"confirmed": self.confirmed, "confirmed_time": self.confirmed_time,
+              "confirmed_silent": silent}
 
   def deactivate(self, wait=False):
     if wait:
@@ -159,6 +164,7 @@ class MQTTRelay(Actuator):
         self.awaiting = False
         self.attempts = 0
         self.mismatch = False
+        self.unconfirmed_since = None
         if self.silent:
           log.info("relay %s is reporting again", self.relay_config.device)
           self.silent = False
@@ -187,6 +193,10 @@ class MQTTRelay(Actuator):
       self.last_sent = power
       self.sent_at = self.clock()
       self.awaiting = self.report_topic is not None
+      if not self.awaiting:
+        self.unconfirmed_since = None
+      elif not repeat and self.unconfirmed_since is None:
+        self.unconfirmed_since = self.sent_at
       self.mismatch = False
     try:
       if self.client is None:

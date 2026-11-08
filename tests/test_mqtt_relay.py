@@ -342,9 +342,10 @@ def test_a_matching_report_confirms_the_command(mqtt_clients, clock):
 
   report(relay, 1)
 
-  assert relay.status() == {"confirmed": 1, "confirmed_time": "2026-11-08T10:00:00Z"}
+  assert relay.status() == {"confirmed": 1, "confirmed_time": "2026-11-08T10:00:00Z",
+                            "confirmed_silent": False}
   assert relay.link_quality == 100
-  clock.value += 3600
+  clock.value += 30
   decide(relay, 1)
   assert sent(mqtt_clients) == [payload(1)]
 
@@ -353,7 +354,7 @@ def test_the_status_is_null_until_the_first_report(mqtt_clients, clock):
   relay = make_relay(clock)
   decide(relay, 1)
 
-  assert relay.status() == {"confirmed": None, "confirmed_time": None}
+  assert relay.status() == {"confirmed": None, "confirmed_time": None, "confirmed_silent": False}
 
 
 def test_silence_resends_with_a_growing_delay_up_to_a_cap(mqtt_clients, clock):
@@ -394,7 +395,7 @@ def test_a_report_ends_the_retries(mqtt_clients, clock):
   decide(relay, 1)
   report(relay, 1)
 
-  clock.value += 1000
+  clock.value += 30
   decide(relay, 1)
 
   assert sent(mqtt_clients) == [payload(1), payload(1)]
@@ -425,7 +426,7 @@ def test_a_report_for_another_device_is_ignored(mqtt_clients, clock):
   report(relay, 0, device="0x1234", name="other")
   report(relay, 1, device="0x1234", name="other")
 
-  assert relay.status() == {"confirmed": None, "confirmed_time": None}
+  assert relay.status() == {"confirmed": None, "confirmed_time": None, "confirmed_silent": False}
   clock.value += 6
   decide(relay, 1)
   assert sent(mqtt_clients) == [payload(1), payload(1)]
@@ -462,7 +463,7 @@ def test_malformed_and_unrelated_payloads_are_ignored(mqtt_clients, clock, raw):
 
   deliver(relay, raw)
 
-  assert relay.status() == {"confirmed": None, "confirmed_time": None}
+  assert relay.status() == {"confirmed": None, "confirmed_time": None, "confirmed_silent": False}
   clock.value += 6
   decide(relay, 1)
   assert sent(mqtt_clients) == [payload(1), payload(1)]
@@ -576,7 +577,7 @@ def test_a_topic_without_a_report_topic_sends_on_change_and_never_retries(mqtt_c
   decide(relay, 1)
 
   relay.on_connect(mqtt_clients.instances[0], None, None, 0, None)
-  clock.value += 10000
+  clock.value += 30
   decide(relay, 1)
   decide(relay, 0)
 
@@ -594,3 +595,172 @@ def test_a_noisy_relay_is_sent_at_most_once_per_decision(mqtt_clients, clock):
   decide(relay, 1)
 
   assert sent(mqtt_clients) == [payload(1), payload(1)]
+
+
+def test_a_matched_state_sends_nothing_before_the_refresh_interval(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  report(relay, 1)
+
+  for _ in range(mqtt_relay.REFRESH_INTERVAL // 5 - 1):
+    clock.value += 5
+    decide(relay, 1)
+
+  assert sent(mqtt_clients) == [payload(1)]
+
+
+def test_a_matched_state_is_sent_once_at_the_refresh_interval(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  report(relay, 1)
+
+  clock.value += mqtt_relay.REFRESH_INTERVAL
+  decide(relay, 1)
+  decide(relay, 1)
+
+  assert sent(mqtt_clients) == [payload(1), payload(1)]
+
+
+def test_a_confirmed_refresh_schedules_the_next_one_an_interval_later(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  report(relay, 1)
+  clock.value += mqtt_relay.REFRESH_INTERVAL
+  decide(relay, 1)
+  report(relay, 1)
+
+  clock.value += mqtt_relay.REFRESH_INTERVAL - 1
+  decide(relay, 1)
+  clock.value += 1
+  decide(relay, 1)
+
+  assert sent(mqtt_clients) == [payload(1)] * 3
+
+
+def test_a_refresh_goes_through_the_report_check_and_the_backoff(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  report(relay, 1)
+  clock.value += mqtt_relay.REFRESH_INTERVAL
+  decide(relay, 1)
+  assert len(sent(mqtt_clients)) == 2
+
+  clock.value += mqtt_relay.CONFIRM_TIMEOUT - 1
+  decide(relay, 1)
+  assert len(sent(mqtt_clients)) == 2
+  clock.value += 1
+  decide(relay, 1)
+  assert len(sent(mqtt_clients)) == 3
+  clock.value += mqtt_relay.CONFIRM_TIMEOUT
+  decide(relay, 1)
+  assert len(sent(mqtt_clients)) == 3
+  clock.value += mqtt_relay.CONFIRM_TIMEOUT
+  decide(relay, 1)
+  assert len(sent(mqtt_clients)) == 4
+
+
+def test_a_refresh_answered_by_a_different_state_corrects_the_relay(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 0)
+  report(relay, 0)
+  clock.value += mqtt_relay.REFRESH_INTERVAL
+  decide(relay, 0)
+
+  report(relay, 1)
+  decide(relay, 0)
+
+  assert sent(mqtt_clients) == [payload(0)] * 3
+
+
+def test_a_failed_refresh_is_resent_on_the_next_tick(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  report(relay, 1)
+  clock.value += mqtt_relay.REFRESH_INTERVAL
+  mqtt_clients.instances[0].rc = 4
+  decide(relay, 1)
+  mqtt_clients.instances[0].rc = 0
+
+  clock.value += 1
+  decide(relay, 1)
+
+  assert sent(mqtt_clients) == [payload(1)] * 3
+  assert relay.failing is False
+
+
+def test_the_refresh_applies_without_a_report_topic(mqtt_clients, clock):
+  relay = make_relay(clock, {**RELAY, "topic": "relay/set"})
+  decide(relay, 1)
+
+  clock.value += mqtt_relay.REFRESH_INTERVAL - 1
+  decide(relay, 1)
+  clock.value += 1
+  decide(relay, 1)
+
+  assert sent(mqtt_clients) == [payload(1)] * 2
+  assert relay.status()["confirmed_silent"] is False
+
+
+def test_confirmed_silent_is_false_before_any_command(mqtt_clients, clock):
+  relay = make_relay(clock)
+
+  clock.value += 1000
+
+  assert relay.status()["confirmed_silent"] is False
+
+
+def test_confirmed_silent_turns_true_after_the_first_backoff_step(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+
+  clock.value += mqtt_relay.CONFIRM_TIMEOUT - 1
+  assert relay.status()["confirmed_silent"] is False
+  clock.value += 1
+  assert relay.status()["confirmed_silent"] is True
+
+
+def test_confirmed_silent_stays_true_across_resends(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  states = []
+
+  for _ in range(60):
+    clock.value += 1
+    decide(relay, 1)
+    states.append(relay.status()["confirmed_silent"])
+
+  assert states[mqtt_relay.CONFIRM_TIMEOUT - 1:] == [True] * (60 - mqtt_relay.CONFIRM_TIMEOUT + 1)
+
+
+def test_a_matching_report_clears_confirmed_silent(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  clock.value += 30
+  assert relay.status()["confirmed_silent"] is True
+
+  report(relay, 1)
+
+  assert relay.status()["confirmed_silent"] is False
+
+
+def test_a_mismatching_report_does_not_clear_confirmed_silent(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  clock.value += 30
+
+  report(relay, 0)
+
+  assert relay.status()["confirmed_silent"] is True
+
+
+def test_a_new_command_starts_a_new_unconfirmed_period(mqtt_clients, clock):
+  relay = make_relay(clock)
+  decide(relay, 1)
+  report(relay, 1)
+
+  decide(relay, 0)
+  clock.value += mqtt_relay.CONFIRM_TIMEOUT - 1
+  assert relay.status()["confirmed_silent"] is False
+  clock.value += 1
+
+  assert relay.status()["confirmed_silent"] is True

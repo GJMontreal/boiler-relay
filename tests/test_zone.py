@@ -651,7 +651,7 @@ def test_an_electric_zone_publishes_its_system(redis_client, gpio, run_ticks):
 
 class ConfirmingOutput(RecordingOutput):
   def status(self):
-    return {"confirmed": 1, "confirmed_time": "2026-11-08T10:00:00Z"}
+    return {"confirmed": 1, "confirmed_time": "2026-11-08T10:00:00Z", "confirmed_silent": True}
 
 
 def test_a_zone_publishes_what_its_output_confirmed(redis_client, gpio, run_ticks):
@@ -664,6 +664,7 @@ def test_a_zone_publishes_what_its_output_confirmed(redis_client, gpio, run_tick
   data = json.loads(redis_client.get("heating/active/zones/Bedrooms"))
   assert data["confirmed"] == 1
   assert data["confirmed_time"] == "2026-11-08T10:00:00Z"
+  assert data["confirmed_silent"] is True
 
 
 def test_a_zone_publishes_the_confirmation_before_the_target_state_exists(redis_client, gpio, run_ticks):
@@ -686,6 +687,7 @@ def test_a_gpio_zone_publishes_a_null_confirmation(redis_client, gpio, run_ticks
   data = json.loads(redis_client.get("heating/active/zones/Bedrooms"))
   assert data["confirmed"] is None
   assert data["confirmed_time"] is None
+  assert data["confirmed_silent"] is None
 
 
 def test_a_shadow_zone_publishes_a_null_confirmation(redis_client, gpio, run_ticks):
@@ -696,3 +698,4 @@ def test_a_shadow_zone_publishes_a_null_confirmation(redis_client, gpio, run_tic
   data = json.loads(redis_client.get("heating/shadow/zones/Bedrooms"))
   assert data["confirmed"] is None
   assert data["confirmed_time"] is None
+  assert data["confirmed_silent"] is None

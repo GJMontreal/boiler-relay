@@ -23,9 +23,11 @@ class StatePublisher:
         self.redis = redis
         self.prefix = f"heating/{mode}"
 
-    def zone(self, name, system, control_value, state, pid=None, confirmed=None, confirmed_time=None):
+    def zone(self, name, system, control_value, state, pid=None, confirmed=None, confirmed_time=None,
+             confirmed_silent=None):
         payload = {"system": system, "control_value": control_value, "state": state,
-                   "confirmed": confirmed, "confirmed_time": confirmed_time}
+                   "confirmed": confirmed, "confirmed_time": confirmed_time,
+                   "confirmed_silent": confirmed_silent}
         if pid is not None:
             payload["pid"] = pid
         self.write(f"zones/{name}", payload)
