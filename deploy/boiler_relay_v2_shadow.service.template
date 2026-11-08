@@ -1,7 +1,6 @@
 [Unit]
 Description=Heating Zone and Boiler Control (shadow)
 After=redis-server.service mosquitto.service
-Conflicts=<service_name>.service
 
 [Service]
 Type=simple
