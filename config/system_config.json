@@ -2,7 +2,8 @@
     "mqtt": {
         "host": "localhost",
         "port": 1883,
-        "keep_alive": 60
+        "keep_alive": 60,
+        "refresh_interval": 60
     },
     "redis": {
         "host": "localhost",

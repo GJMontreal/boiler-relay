@@ -28,6 +28,12 @@ class MQTTConfig(Config):
   host: str
   port: int
   keep_alive: float
+  refresh_interval: float = 60.0
+
+  def __post_init__(self):
+    if not is_number(self.refresh_interval) or self.refresh_interval <= 0:
+      raise ConfigError(f"mqtt refresh_interval must be a positive number of seconds, found {self.refresh_interval!r}")
+    self.refresh_interval = float(self.refresh_interval)
 
 @dataclass
 class RedisConfig(Config):

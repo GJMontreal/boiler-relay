@@ -53,6 +53,26 @@ def test_from_file_reads_mqtt(tmp_path):
   assert config.keep_alive == 60
 
 
+def test_the_mqtt_refresh_interval_defaults_to_a_minute():
+  assert MQTTConfig(host="broker.local", port=1883, keep_alive=60).refresh_interval == 60.0
+
+
+def test_the_mqtt_refresh_interval_is_read_from_the_config():
+  config = SystemConfig.from_dict(system(mqtt={"host": "h", "port": 1883, "keep_alive": 60, "refresh_interval": 30}))
+
+  assert config.mqtt.refresh_interval == 30.0
+
+
+@pytest.mark.parametrize("value", [0, -1, "60", None, True, float("inf"), float("nan")])
+def test_the_mqtt_refresh_interval_must_be_a_positive_number(value):
+  with pytest.raises(ConfigError, match="refresh_interval"):
+    MQTTConfig(host="h", port=1883, keep_alive=60, refresh_interval=value)
+
+
+def test_the_shipped_config_sets_the_mqtt_refresh_interval():
+  assert SystemConfig.from_file(CONFIG_PATH).mqtt.refresh_interval == 60.0
+
+
 def test_from_file_rejects_unknown_keys(tmp_path):
   path = tmp_path / "redis.json"
   path.write_text(dumps({"host": "localhost", "port": 6379, "extra": 1}))

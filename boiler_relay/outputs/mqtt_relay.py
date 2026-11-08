@@ -14,7 +14,6 @@ log = logging.getLogger(__name__)
 SEND_TIMEOUT = 2
 CONFIRM_TIMEOUT = 5
 RETRY_CAP = 120
-REFRESH_INTERVAL = 60
 
 
 def report_topic(command_topic):
@@ -99,7 +98,7 @@ class MQTTRelay(Actuator):
     if self.last_sent is None or self.failing or self.mismatch or power != self.last_sent:
       return True
     if not self.awaiting:
-      return self.clock() - self.sent_at >= REFRESH_INTERVAL
+      return self.clock() - self.sent_at >= self.mqtt_config.refresh_interval
     waited = self.clock() - self.sent_at
     if waited < self.retry_delay():
       return False

@@ -602,7 +602,7 @@ def test_a_matched_state_sends_nothing_before_the_refresh_interval(mqtt_clients,
   decide(relay, 1)
   report(relay, 1)
 
-  for _ in range(mqtt_relay.REFRESH_INTERVAL // 5 - 1):
+  for _ in range(int(MQTT.refresh_interval // 5) - 1):
     clock.value += 5
     decide(relay, 1)
 
@@ -614,7 +614,7 @@ def test_a_matched_state_is_sent_once_at_the_refresh_interval(mqtt_clients, cloc
   decide(relay, 1)
   report(relay, 1)
 
-  clock.value += mqtt_relay.REFRESH_INTERVAL
+  clock.value += MQTT.refresh_interval
   decide(relay, 1)
   decide(relay, 1)
 
@@ -625,11 +625,11 @@ def test_a_confirmed_refresh_schedules_the_next_one_an_interval_later(mqtt_clien
   relay = make_relay(clock)
   decide(relay, 1)
   report(relay, 1)
-  clock.value += mqtt_relay.REFRESH_INTERVAL
+  clock.value += MQTT.refresh_interval
   decide(relay, 1)
   report(relay, 1)
 
-  clock.value += mqtt_relay.REFRESH_INTERVAL - 1
+  clock.value += MQTT.refresh_interval - 1
   decide(relay, 1)
   clock.value += 1
   decide(relay, 1)
@@ -641,7 +641,7 @@ def test_a_refresh_goes_through_the_report_check_and_the_backoff(mqtt_clients, c
   relay = make_relay(clock)
   decide(relay, 1)
   report(relay, 1)
-  clock.value += mqtt_relay.REFRESH_INTERVAL
+  clock.value += MQTT.refresh_interval
   decide(relay, 1)
   assert len(sent(mqtt_clients)) == 2
 
@@ -663,7 +663,7 @@ def test_a_refresh_answered_by_a_different_state_corrects_the_relay(mqtt_clients
   relay = make_relay(clock)
   decide(relay, 0)
   report(relay, 0)
-  clock.value += mqtt_relay.REFRESH_INTERVAL
+  clock.value += MQTT.refresh_interval
   decide(relay, 0)
 
   report(relay, 1)
@@ -676,7 +676,7 @@ def test_a_failed_refresh_is_resent_on_the_next_tick(mqtt_clients, clock):
   relay = make_relay(clock)
   decide(relay, 1)
   report(relay, 1)
-  clock.value += mqtt_relay.REFRESH_INTERVAL
+  clock.value += MQTT.refresh_interval
   mqtt_clients.instances[0].rc = 4
   decide(relay, 1)
   mqtt_clients.instances[0].rc = 0
@@ -692,7 +692,7 @@ def test_the_refresh_applies_without_a_report_topic(mqtt_clients, clock):
   relay = make_relay(clock, {**RELAY, "topic": "relay/set"})
   decide(relay, 1)
 
-  clock.value += mqtt_relay.REFRESH_INTERVAL - 1
+  clock.value += MQTT.refresh_interval - 1
   decide(relay, 1)
   clock.value += 1
   decide(relay, 1)
