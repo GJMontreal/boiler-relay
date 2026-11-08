@@ -31,5 +31,5 @@ The project controls two systems, set per zone by the `system` field. Hydronic i
 - [ ] Review the device's login credentials and remote access.
 - [ ] The `back_room` sensor stopped reporting on 2026-10-24. Check its battery.
 - [x] Set every end-switch input to gpio mode with the pull disabled, so no pin relies on its power-on state.
-- [ ] Check on the device that the service user can write the pinmux state files, or that `GPIO.setup` on an end-switch input succeeds at startup.
+- [x] Check on the device that the service user can write the pinmux state files, or that `GPIO.setup` on an end-switch input succeeds at startup.
 - [ ] Move PID gains per zone only if the stairwell radiator needs different ones. The config already supports it.
