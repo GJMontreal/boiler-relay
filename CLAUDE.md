@@ -57,7 +57,7 @@ The zone and boiler threads also write state under `heating/<mode>/`, listed und
 - Tests live in `tests/` and use pytest with fakeredis and a recording GPIO. Run `.venv/bin/python -m pytest`. Loop threads are stopped by a fake `sleep` that raises, see `run_ticks` in `tests/conftest.py`.
 - No linter. Run `python -m boiler_relay` to smoke test with the stub GPIO. It needs a local redis.
 - Update `README.md` and `CLAUDE.md` before you commit a change, so the code and its docs land in one commit. A change to behavior, config or a published key needs both checked. Do not add a docs-only commit afterwards.
-- When another session asked for the work, message that session when the work is finished. Say what was done, the commit hashes, and any tag, push or deploy that did not happen. The message does not replace the user's approval for a push or a tag. Ask the user for those first.
+- When another session asked for the work, push each commit to `more_better_modular` once it is made, then message that session without asking the user. Say what was done, the commit hashes, the tip, and any tag or deploy that did not happen. Ask the user before you tag. Tell the session the work is ready to tag. Work the user started themselves still needs the user's approval for a push, a tag and a message to another session.
 - CI runs `pytest` on Python 3.7 and 3.11 (`.github/workflows/test.yml`). It has not run yet.
 
 ## Setup
