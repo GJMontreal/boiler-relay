@@ -8,7 +8,7 @@ Python control software for two heating systems on a BeagleBone. Hydronic is a b
 
 Known breakage in the new code:
 
-- `MQTTRelay` publishing has run against a real broker (paho-mqtt 2.2.0 on a Mac, topic `boiler_relay/test`), where the payloads arrived in order and a failed connection warned once and recovered. It has not switched the real Zigbee relay, and a broker dying mid-connection has not been tried. The report subscription, the confirmation, the silence retries and the refresh have only run against a fake client. Nobody has checked that the relay reports a command that repeats its current state, which the refresh and `confirmed_silent` assume.
+- `MQTTRelay` publishing has run against a real broker (paho-mqtt 2.2.0 on a Mac, topic `boiler_relay/test`), where the payloads arrived in order and a failed connection warned once and recovered. It has not switched the real Zigbee relay, and a broker dying mid-connection has not been tried. The report subscription, the confirmation, the silence retries and the refresh have only run against a fake client. On 2026-11-08 the relay answered every repeated command with a report, 17 of 17, at the 5 second cadence. Nobody has measured a repeat at the 60 second refresh interval, which the refresh and `confirmed_silent` assume.
 - `deploy.sh`, `deploy/switch.sh`, the two unit templates and the legacy drop-in have not been run against a device. They have only run against stub `ssh` and `rsync`. The `Conflicts=` behavior, the drop-in after `daemon-reload` and `enable` on the copied units are unchecked.
 - The device runs Python 3.7.3. A clean install of `requirements.txt` and the tests pass on `python:3.7.17` in Docker. Neither has run on the device itself.
 

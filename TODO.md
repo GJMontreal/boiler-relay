@@ -28,7 +28,7 @@ The project controls two systems, set per zone by the `system` field. Hydronic i
 ## Backlog
 
 - [ ] Boiler short-cycling protection (a minimum on and off time). Deferred until the problem shows.
-- [ ] Check on the device that the relay confirmation works: the subscription, the `confirmed` fields, the silence retries and the refresh. Check that the relay reports a command that repeats its current state, because the refresh and `confirmed_silent` assume it does. It has only run against a fake client.
+- [ ] Check on the device that the relay confirmation works: the subscription, the `confirmed` fields, the silence retries and the refresh. The relay reported every repeated command at the 5 second cadence on 2026-11-08, 17 of 17. Watch one 60 second refresh on the device and check that `confirmed_silent` stays false. The code has only run against a fake client.
 - [ ] Publish a real MQTT message from `MQTTRelay` with the real topic and device and check the Zigbee relay switches. Publishing to a broker already passes.
 - [ ] Revisit sending relay commands through redis and the bridge, which would drop paho from the control process. Not now, because the radiator would then depend on the bridge to switch.
 - [ ] Homebridge needs a stairwell thermostat that writes `/home/sensors/stairwell/target_temperature` and `target_heatingcooling_state`. Until it does, the Stairwell zone idles.
