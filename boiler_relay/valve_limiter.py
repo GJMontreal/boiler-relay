@@ -1,16 +1,25 @@
 import logging
+from time import monotonic
 
 log = logging.getLogger(__name__)
 
 class ValveLimiter:
-    def __init__(self, name, min_on, min_off, closed_for=None):
+    def __init__(self, name, min_on, min_off, clock=monotonic):
         self.name = name
         self.min_on = min_on
         self.min_off = min_off
+        self.clock = clock
         self.open = False
-        self.age = min_off if closed_for is None else closed_for
+        self.age = min_off
+        self.stamp = None
         self.balance = 0.0
         self.noted = False
+
+    def elapse(self, dt):
+        now = self.clock()
+        elapsed = 0.0 if self.stamp is None else now - self.stamp
+        self.stamp = now
+        self.age += max(dt, elapsed)
 
     def step(self, demand, calling, dt, pending=0.0, boost=False, cut=False):
         if boost:
@@ -20,7 +29,7 @@ class ValveLimiter:
             self.cut(dt)
             return False
 
-        self.age += dt
+        self.elapse(dt)
         if not calling:
             self.balance = 0.0
 
@@ -31,7 +40,7 @@ class ValveLimiter:
         return self.open
 
     def cut(self, dt=0.0):
-        self.age += dt
+        self.elapse(dt)
         self.balance = 0.0
         self.noted = False
         if self.open:
@@ -41,6 +50,7 @@ class ValveLimiter:
             self.age = 0.0
 
     def bypass(self):
+        self.stamp = self.clock()
         if not self.open:
             self.open = True
             self.age = 0.0

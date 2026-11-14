@@ -202,11 +202,72 @@ def test_boost_wins_over_a_cut():
   assert valve.step(False, False, DT, boost=True, cut=True) is True
 
 
-def test_a_valve_can_start_as_just_closed():
-  valve = ValveLimiter("Bedrooms", MIN_ON, MIN_OFF, closed_for=0.0)
+class Clock:
+  def __init__(self):
+    self.now = 1000.0
 
-  assert not any(run(valve, True, MIN_OFF - 10, pending=MIN_ON))
-  assert any(run(valve, True, 20, pending=MIN_ON))
+  def __call__(self):
+    return self.now
+
+
+def clocked():
+  clock = Clock()
+  return ValveLimiter("Bedrooms", MIN_ON, MIN_OFF, clock=clock), clock
+
+
+def test_a_fresh_valve_opens_at_the_first_tick_that_demands_it():
+  valve = limiter()
+
+  assert valve.step(True, True, DT, pending=MIN_ON) is True
+
+
+def test_a_gap_by_the_clock_counts_as_time_closed():
+  valve, clock = clocked()
+  valve.step(True, True, DT, pending=MIN_ON)
+  clock.now += 10
+  valve.step(False, False, DT, cut=True)
+
+  clock.now += 7200
+  assert valve.step(True, True, DT, pending=MIN_ON) is True
+
+
+def test_a_close_is_not_reopened_before_the_off_time_by_the_clock():
+  valve, clock = clocked()
+  valve.step(True, True, DT, pending=MIN_ON)
+  clock.now += 10
+  valve.step(False, False, DT, cut=True)
+
+  opened = []
+  for _ in range(int(MIN_OFF / DT) - 2):
+    clock.now += DT
+    opened.append(valve.step(True, True, DT, pending=MIN_ON))
+
+  assert not any(opened)
+  for _ in range(4):
+    clock.now += DT
+    opened.append(valve.step(True, True, DT, pending=MIN_ON))
+  assert opened[-1] is True
+
+
+def test_a_cut_after_a_gap_counts_the_gap_and_keeps_the_timer_running():
+  valve, clock = clocked()
+  valve.cut()
+  clock.now += 400
+
+  valve.cut()
+
+  assert valve.age >= MIN_OFF + 400
+
+
+def test_boost_restarts_the_clock_reading():
+  valve, clock = clocked()
+  valve.step(False, False, DT, boost=True)
+  clock.now += 3600
+  valve.step(False, False, DT, boost=True)
+  valve.step(False, False, DT)
+
+  assert valve.open is False
+  assert valve.age < 100
 
 
 def test_a_cut_that_overrides_the_minimum_is_logged(caplog):

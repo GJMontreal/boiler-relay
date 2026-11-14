@@ -43,7 +43,8 @@ class Zone(Thread):
         self.limiter = None
         if self.system == "hydronic" and zone_config.valve_limits is not None:
             limits = zone_config.valve_limits
-            self.limiter = ValveLimiter(self.name, limits.min_on_time * 60, limits.min_off_time * 60, closed_for=0.0)
+            self.limiter = ValveLimiter(self.name, limits.min_on_time * 60, limits.min_off_time * 60,
+                                      clock=monotonic)
 
         self.outputs = []
         if not self.shadow:

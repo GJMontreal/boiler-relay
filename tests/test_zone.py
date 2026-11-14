@@ -733,8 +733,11 @@ def test_the_active_zone_builds_a_limiter_from_the_limits(redis_client, gpio):
   assert make_limited_zone(1.0, mode="active").limiter is not None
 
 
-def test_a_limiter_starts_as_just_closed(redis_client, gpio):
-  assert make_limited_zone(1.0).limiter.age == 0.0
+def test_a_limiter_starts_with_both_minimums_satisfied(redis_client, gpio):
+  limiter = make_limited_zone(1.0).limiter
+
+  assert limiter.age >= limiter.min_off
+  assert limiter.open is False
 
 
 def test_an_electric_zone_has_no_limiter(redis_client, gpio):
@@ -820,13 +823,41 @@ def live_values(run_ticks, zone, ticks, on_tick=None):
   return seen
 
 
-def test_a_live_zone_waits_the_off_time_after_a_start(redis_client, gpio, run_ticks):
+def test_a_live_zone_opens_at_the_first_tick_after_a_start(redis_client, gpio, run_ticks):
   seed(redis_client, current=20, target=21, state=1)
 
-  values = live_values(run_ticks, make_live_zone(0.5), 120 * 2)
+  assert live_values(run_ticks, make_live_zone(0.5), 3) == [1, 1, 1]
 
-  assert values[:155] == [0] * 155
-  assert values[156] == 1
+
+def test_a_restart_in_the_middle_of_a_closed_period_does_not_delay_the_first_call(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20, target=21, state=1)
+  first = make_live_zone(0.5)
+  first.limiter.step(True, True, 5, pending=300)
+  first.limiter.cut(5)
+  first.shutdown()
+
+  assert live_values(run_ticks, make_live_zone(0.5), 2) == [1, 1]
+
+
+def test_a_long_outage_by_the_clock_does_not_delay_the_first_call_after_recovery(redis_client, gpio, run_ticks, monkeypatch):
+  seed(redis_client, current=20, target=21, state=1)
+  clock = [1000.0]
+  monkeypatch.setattr(zone_module, "monotonic", lambda: clock[0])
+  zone = make_live_zone(1.0)
+  zone.limiter.age = 10000
+  assert live_values(run_ticks, zone, 3) == [1, 1, 1]
+
+  real_get = zone.redis.get
+  monkeypatch.setattr(zone.redis, "get", lambda key: (_ for _ in ()).throw(ConnectionError("redis is down")))
+  run_ticks(zone, 3)
+  assert zone.limiter.open is False
+
+  clock[0] += 2 * 60 * 60
+  monkeypatch.setattr(zone.redis, "get", real_get)
+  seed(redis_client, current=20, sample_time="2026-11-14T12:00:00Z")
+  zone.outputs[0].values.clear()
+
+  assert live_values(run_ticks, zone, 2) == [1, 1]
 
 
 def test_a_live_zone_never_opens_for_less_than_the_minimum_on_time(redis_client, gpio, run_ticks):
