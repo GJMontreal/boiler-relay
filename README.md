@@ -84,6 +84,21 @@ The limits come from valve travel. The end switch rises 3.5 to 3.9 minutes after
 
 The mean heat follows the PID. The valve delivers what it accumulated, and it stays open longer than the demand only to reach the minimum, which the accumulator then forgets. The log gets one info line when a minimum holds a command back, when a valve is held open to its minimum, and when accumulated demand is released. Each hold logs once. The published keys are unchanged. The shadow's `state` is the limited decision, and `control_value` is still the PID output.
 
+### Replaying the limiter
+
+`tools/export_samples.py` reads the device's history database in read-only mode and writes a CSV with `zone`, `ts`, `sh_ctl`, `ctl`, `mode`, `boost`, `out` and `target` for the four hydronic zones. Run it on the device with `ssh <user>@<host> python3 - < tools/export_samples.py > samples.csv`. It takes an optional database path as its first argument.
+
+`python tools/replay_limiter.py samples.csv ctl` replays the limiter over those samples. The column is `ctl` for the live controller's control values or `sh_ctl` for the shadow's. `--min-on` and `--min-off` set the minimums in minutes and default to 5 and 13. For each zone it rebuilds the 120 tick duty window at 5 second ticks and prints the calls, the calls under 5 minutes, the reopens within 13 minutes of a close, the on fraction and the median call, without and with the limiter. The history keeps about 7 days of raw samples, so export again before they age out. The export holds the house's own temperature targets, so it stays out of the repo.
+
+On the week to 2026-11-14 with the shadow's control values, calls fell from 225 to 67 in Bedrooms, 242 to 81 in Common, 244 to 77 in Kitchen and 67 to 21 in Study. Calls under 5 minutes fell to 1 in Bedrooms and 0 elsewhere, and reopens within 13 minutes fell to 0. The on fraction moved by less than 0.006 in every zone.
+
+The replay has limits:
+
+- It is open loop. The room temperature does not respond to the limited valves.
+- The window phase is arbitrary.
+- The shadow cannot see end switches, so 5 and 13 minutes are estimates from observed travel times.
+- A valve takes 8 to 13 minutes to close, so the Study may need a longer off time.
+
 The end switch pairing is verified on the device for all five valves, by boost tests read through sysfs on 2026-11-07.
 
 - **Common and Kitchen** were swapped in the old config. Common's valve (`P8_8`) reports on `P8_15` and Kitchen's valve (`P8_16`) reports on `P8_7`, so the config pairs them that way.
