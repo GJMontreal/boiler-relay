@@ -3,19 +3,22 @@ import logging
 log = logging.getLogger(__name__)
 
 class ValveLimiter:
-    def __init__(self, name, min_on, min_off):
+    def __init__(self, name, min_on, min_off, closed_for=None):
         self.name = name
         self.min_on = min_on
         self.min_off = min_off
         self.open = False
-        self.age = min_off
+        self.age = min_off if closed_for is None else closed_for
         self.balance = 0.0
         self.noted = False
 
-    def step(self, demand, calling, dt, pending=0.0, boost=False):
+    def step(self, demand, calling, dt, pending=0.0, boost=False, cut=False):
         if boost:
             self.bypass()
             return True
+        if cut:
+            self.cut(dt)
+            return False
 
         self.age += dt
         if not calling:
@@ -27,9 +30,15 @@ class ValveLimiter:
             self.step_closed(demand, dt, pending)
         return self.open
 
-    def advance(self, dt):
+    def cut(self, dt=0.0):
         self.age += dt
         self.balance = 0.0
+        self.noted = False
+        if self.open:
+            if self.age < self.min_on:
+                log.info("zone %s closes the valve before its minimum on time, the call was cut", self.name)
+            self.open = False
+            self.age = 0.0
 
     def bypass(self):
         if not self.open:

@@ -41,9 +41,9 @@ class Zone(Thread):
         self.duration = zone_config.control_interval * 60 / self.interval
 
         self.limiter = None
-        if self.shadow and self.system == "hydronic" and zone_config.valve_limits is not None:
+        if self.system == "hydronic" and zone_config.valve_limits is not None:
             limits = zone_config.valve_limits
-            self.limiter = ValveLimiter(self.name, limits.min_on_time * 60, limits.min_off_time * 60)
+            self.limiter = ValveLimiter(self.name, limits.min_on_time * 60, limits.min_off_time * 60, closed_for=0.0)
 
         self.outputs = []
         if not self.shadow:
@@ -57,6 +57,7 @@ class Zone(Thread):
         self.last_change_at = None
         self.state = None
         self.failures = 0
+        self.sensor_usable = False
         self.warned = set()
         self.stopping = Event()
         self.window_ticks = 0
@@ -90,7 +91,16 @@ class Zone(Thread):
         for output in self.outputs:
             output.stop()
 
+    def cut_limiter(self):
+        if self.limiter is None:
+            return
+        self.limiter.cut(self.interval)
+        for output in self.outputs:
+            output.activate(HeatingCoolingState.OFF.value)
+
     def deactivate_outputs(self, wait=False):
+        if self.limiter is not None:
+            self.limiter.cut()
         for output in self.outputs:
             try:
                 output.deactivate(wait=wait)
@@ -121,8 +131,7 @@ class Zone(Thread):
 
         target_state = self.read_target_state()
         if target_state is None:
-            if self.limiter:
-                self.limiter.advance(self.interval)
+            self.cut_limiter()
             self.publisher.zone(self.name, self.system, self.control_value, None, asdict(self.gains),
                                 **self.confirmation())
             return
@@ -181,6 +190,7 @@ class Zone(Thread):
         return max(0.0, (datetime.now(timezone.utc) - reported).total_seconds())
 
     def compute_control_value(self):
+        self.sensor_usable = False
         if self.current_temperature is None:
             self.warn("sensor", "no temperature reading yet, calling for no heat")
             return 0.0
@@ -189,6 +199,7 @@ class Zone(Thread):
                 self.pid.reset()
             return 0.0
         self.clear("sensor")
+        self.sensor_usable = True
         self.pid.setpoint = self.target_temperature
         return self.pid(self.current_temperature)
 
@@ -224,7 +235,8 @@ class Zone(Thread):
         on_ticks = int(self.control_value * self.duration)
         pending = max(0, on_ticks - self.cycle - 1) * self.interval if calling else 0
         demand = state == HeatingCoolingState.HEAT
-        if self.limiter.step(demand, calling, self.interval, pending, boost=boost):
+        cut = target_state != HeatingCoolingState.HEAT or not self.sensor_usable
+        if self.limiter.step(demand, calling, self.interval, pending, boost=boost, cut=cut):
             return HeatingCoolingState.HEAT
         return HeatingCoolingState.OFF
 

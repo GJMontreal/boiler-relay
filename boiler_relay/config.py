@@ -95,6 +95,8 @@ class ZoneConfig(Config):
   def __post_init__(self):
     self.pid_interval = float(self.pid_interval)
     self.control_interval = float(self.control_interval)
+    if self.valve_limits is not None and not isinstance(self.valve_limits, ValveLimitsConfig):
+      raise ConfigError(f"zone {self.name}: valve_limits belongs at the top level, not on a zone")
     if not isinstance(self.pid, PIDConfig):
       try:
         self.pid = PIDConfig(**(self.pid or {}))
@@ -134,9 +136,6 @@ class RelayConfig(Config):
 @dataclass
 class ShadowConfig(Config):
   pid: PIDConfig
-  min_on_time: float = 5.0
-  min_off_time: float = 13.0
-  valve_limits: ValveLimitsConfig = None
 
   def __post_init__(self):
     if not isinstance(self.pid, PIDConfig):
@@ -144,13 +143,9 @@ class ShadowConfig(Config):
         self.pid = PIDConfig(**(self.pid or {}))
       except ConfigError as error:
         raise ConfigError(f"shadow: {error}")
-    try:
-      self.valve_limits = ValveLimitsConfig(self.min_on_time, self.min_off_time)
-    except ConfigError as error:
-      raise ConfigError(f"shadow: {error}")
 
 SITE_NAME_LIMIT = 60
-SECTIONS = {"redis", "boiler", "zones", "mqtt", "shadow", "pid", "site_name"}
+SECTIONS = {"redis", "boiler", "zones", "mqtt", "shadow", "pid", "valve_limits", "site_name"}
 
 def check_site_name(value):
   if not isinstance(value, str):
@@ -171,6 +166,7 @@ class SystemConfig(Config):
   mqtt: MQTTConfig = None
   shadow: ShadowConfig = None
   pid: PIDConfig = None
+  valve_limits: ValveLimitsConfig = None
   site_name: str = None
 
   @classmethod
@@ -186,12 +182,14 @@ class SystemConfig(Config):
     boiler = cls.build("boiler", BoilerConfig, data["boiler"])
     mqtt = cls.build("mqtt", MQTTConfig, data["mqtt"]) if "mqtt" in data else None
     pid = cls.build_default_pid(data["pid"]) if "pid" in data else None
-    zones = [cls.build_zone(index, entry, pid) for index, entry in enumerate(data["zones"])]
+    valve_limits = cls.build_valve_limits(data["valve_limits"]) if "valve_limits" in data else None
+    zones = [cls.build_zone(index, entry, pid, valve_limits) for index, entry in enumerate(data["zones"])]
     site_name = check_site_name(data["site_name"]) if "site_name" in data else None
 
     shadow = cls.build("shadow", ShadowConfig, data["shadow"]) if "shadow" in data else None
 
-    config = cls(redis=redis, boiler=boiler, zones=zones, mqtt=mqtt, shadow=shadow, pid=pid, site_name=site_name)
+    config = cls(redis=redis, boiler=boiler, zones=zones, mqtt=mqtt, shadow=shadow, pid=pid,
+                    valve_limits=valve_limits, site_name=site_name)
     config.validate()
     return config
 
@@ -215,11 +213,22 @@ class SystemConfig(Config):
     except (TypeError, ValueError) as error:
       raise ConfigError(f"invalid top-level pid config: {error}")
 
+  @staticmethod
+  def build_valve_limits(entry):
+    try:
+      return ValveLimitsConfig(**entry)
+    except ConfigError as error:
+      raise ConfigError(f"valve_limits: {error}")
+    except (TypeError, ValueError) as error:
+      raise ConfigError(f"invalid valve_limits config: {error}")
+
   @classmethod
-  def build_zone(cls, index, entry, default_pid):
+  def build_zone(cls, index, entry, default_pid, valve_limits):
     zone = cls.build(f"zone {entry.get('name', index)}", ZoneConfig, entry)
     if default_pid is not None and entry.get("pid") is None:
-      return replace(zone, pid=default_pid)
+      zone = replace(zone, pid=default_pid)
+    if valve_limits is not None and zone.system == HYDRONIC:
+      zone = replace(zone, valve_limits=valve_limits)
     return zone
 
   @staticmethod
@@ -256,5 +265,4 @@ class SystemConfig(Config):
   def zones_for(self, shadow) -> list[ZoneConfig]:
     if not shadow or self.shadow is None:
       return self.zones
-    return [replace(zone, pid=self.shadow.pid, valve_limits=self.shadow.valve_limits)
-            if zone.system == HYDRONIC else zone for zone in self.zones]
+    return [replace(zone, pid=self.shadow.pid) if zone.system == HYDRONIC else zone for zone in self.zones]

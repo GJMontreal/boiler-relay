@@ -63,7 +63,7 @@ def replay_zone(name, rows, column, min_on, min_off):
             limited.append(False)
         previous = stamp
         if row["mode"] == "":
-            limiter.advance(TICK * 2)
+            limiter.cut(TICK * 2)
             continue
         heat = row["mode"] == "1"
         boost = row["boost"] == "1"
@@ -73,7 +73,7 @@ def replay_zone(name, rows, column, min_on, min_off):
             demand = heat and on_ticks > cycle
             calling = heat and control > 0
             pending = max(0, on_ticks - cycle - 1) * TICK if calling else 0
-            opened = limiter.step(demand, calling, TICK, pending, boost=boost)
+            opened = limiter.step(demand, calling, TICK, pending, boost=boost, cut=not heat)
             if not boost:
                 baseline.append(demand)
                 limited.append(opened)

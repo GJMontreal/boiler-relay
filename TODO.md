@@ -28,10 +28,10 @@ The project controls two systems, set per zone by the `system` field. Hydronic i
 ## Backlog
 
 - [x] Accept an optional top-level `site_name` in the config for the web interface title. The controller validates it and ignores it. The real name stays in a device-only file.
-- [x] Add a minimum valve on time and off time for hydronic zones, in the shadow only (`shadow.min_on_time` 5, `shadow.min_off_time` 13 minutes). Short demand accumulates and releases as one call.
+- [x] Add a minimum valve on time and off time for hydronic zones, (`valve_limits.min_on_time` 5, `valve_limits.min_off_time` 13 minutes). Short demand accumulates and releases as one call. The limiter ran in the shadow first and now runs in the live controller too. Deleting the section is the rollback.
 - [x] Replay the limiter over a week of device samples with `tools/replay_limiter.py`. Calls under 5 minutes fell to 1 or 0 in every zone, and the on fraction moved by less than 0.006.
 - [ ] Check whether the Study needs an off time above 13 minutes. Its valve takes 8 to 13 minutes to close, and the replay cannot see end switches.
-- [ ] Compare the shadow's limited `state` with the live valves over a week, then move `min_on_time` and `min_off_time` to the top level so the live controller applies them. Re-tune against the end switch fall times, which sample sizes of 3 to 17 leave uncertain.
+- [ ] Watch the live valves with the limiter on for a week. Compare `state` and the end switches, and re-tune against the end switch fall times, which sample sizes of 3 to 17 leave uncertain.
 - [ ] Boiler short-cycling protection (a minimum on and off time). Deferred until the problem shows.
 - [ ] Check on the device that the relay confirmation works: the subscription, the `confirmed` fields, the silence retries and the refresh. The relay reported every repeated command at the 5 second cadence on 2026-11-08, 17 of 17. Watch one 60 second refresh on the device and check that `confirmed_silent` stays false. The code has only run against a fake client.
 - [ ] Publish a real MQTT message from `MQTTRelay` with the real topic and device and check the Zigbee relay switches. Publishing to a broker already passes.

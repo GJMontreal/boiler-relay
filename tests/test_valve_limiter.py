@@ -155,14 +155,67 @@ def test_losing_the_call_drops_the_accumulated_demand():
   assert not any(run(valve, True, 120))
 
 
-def test_advance_drops_the_accumulated_demand_and_moves_the_clock():
+def test_cut_drops_the_accumulated_demand_and_moves_the_clock():
   valve = limiter()
   run(valve, True, 100)
 
-  valve.advance(MIN_OFF)
+  valve.cut(MIN_OFF)
 
   assert valve.balance == 0.0
   assert valve.age >= MIN_OFF
+
+
+def test_a_cut_closes_an_open_valve_before_its_minimum_on_time():
+  valve = limiter()
+  run(valve, True, 20, pending=MIN_ON)
+  assert valve.open is True
+
+  assert valve.step(False, False, DT, cut=True) is False
+  assert valve.open is False
+  assert valve.age == 0.0
+
+
+def test_a_cut_starts_the_off_time_from_the_close():
+  valve = limiter()
+  run(valve, True, 20, pending=MIN_ON)
+  valve.step(False, False, DT, cut=True)
+
+  assert not any(run(valve, True, MIN_OFF - 20, pending=MIN_ON))
+  assert any(run(valve, True, 40, pending=MIN_ON))
+
+
+def test_a_cut_on_a_closed_valve_keeps_the_off_timer_running():
+  valve = limiter()
+  run(valve, True, 20, pending=MIN_ON)
+  valve.step(False, False, DT, cut=True)
+  run(valve, False, 100, calling=False)
+  age = valve.age
+
+  valve.step(False, False, DT, cut=True)
+
+  assert valve.age == age + DT
+
+
+def test_boost_wins_over_a_cut():
+  valve = limiter()
+
+  assert valve.step(False, False, DT, boost=True, cut=True) is True
+
+
+def test_a_valve_can_start_as_just_closed():
+  valve = ValveLimiter("Bedrooms", MIN_ON, MIN_OFF, closed_for=0.0)
+
+  assert not any(run(valve, True, MIN_OFF - 10, pending=MIN_ON))
+  assert any(run(valve, True, 20, pending=MIN_ON))
+
+
+def test_a_cut_that_overrides_the_minimum_is_logged(caplog):
+  valve = limiter()
+  run(valve, True, 20, pending=MIN_ON)
+  with caplog.at_level(logging.INFO):
+    valve.step(False, False, DT, cut=True)
+
+  assert any("before its minimum on time" in record.getMessage() for record in caplog.records)
 
 
 def test_a_hold_is_logged_once(caplog):

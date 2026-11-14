@@ -558,43 +558,61 @@ def test_the_shipped_config_names_the_site_generically():
   assert SystemConfig.from_file(CONFIG_PATH).site_name == "Heating"
 
 
-def test_the_shadow_valve_limits_default_to_five_and_thirteen_minutes():
+def test_the_valve_limits_default_to_five_and_thirteen_minutes():
+  config = SystemConfig.from_dict(system(valve_limits={}))
+
+  assert config.valve_limits == ValveLimitsConfig(min_on_time=5, min_off_time=13)
+
+
+def test_the_valve_limits_are_read_from_the_config():
+  config = SystemConfig.from_dict(system(valve_limits={"min_on_time": 4, "min_off_time": 10}))
+
+  assert config.valve_limits == ValveLimitsConfig(min_on_time=4, min_off_time=10)
+
+
+def test_the_valve_limits_reach_hydronic_zones_in_both_modes():
+  config = SystemConfig.from_dict(system(zones=[ZONE, ELECTRIC_ZONE], valve_limits={}, shadow={"pid": SHADOW_PID}))
+
+  for shadow in (False, True):
+    hydronic, electric = config.zones_for(shadow)
+    assert hydronic.valve_limits == ValveLimitsConfig()
+    assert electric.valve_limits is None
+
+
+def test_a_config_without_a_valve_limits_section_sets_none():
   config = SystemConfig.from_dict(system(shadow={"pid": SHADOW_PID}))
 
-  assert config.shadow.valve_limits == ValveLimitsConfig(min_on_time=5, min_off_time=13)
+  assert config.valve_limits is None
+  assert all(zone.valve_limits is None for shadow in (False, True) for zone in config.zones_for(shadow))
 
 
-def test_the_shadow_valve_limits_are_read_from_the_config():
-  config = SystemConfig.from_dict(system(shadow={"pid": SHADOW_PID, "min_on_time": 4, "min_off_time": 10}))
-
-  assert config.shadow.valve_limits == ValveLimitsConfig(min_on_time=4, min_off_time=10)
-
-
-def test_the_shadow_valve_limits_reach_hydronic_zones_in_shadow_mode_only():
-  config = SystemConfig.from_dict(system(zones=[ZONE, ELECTRIC_ZONE], shadow={"pid": SHADOW_PID}))
-
-  hydronic, electric = config.zones_for(True)
-  assert hydronic.valve_limits == ValveLimitsConfig()
-  assert electric.valve_limits is None
-  assert all(zone.valve_limits is None for zone in config.zones_for(False))
+def test_the_shadow_section_no_longer_takes_valve_limits():
+  with pytest.raises(ConfigError, match="shadow"):
+    SystemConfig.from_dict(system(shadow={"pid": SHADOW_PID, "min_on_time": 5}))
 
 
-def test_a_config_without_a_shadow_section_sets_no_valve_limits():
-  config = SystemConfig.from_dict(system())
+def test_a_zone_cannot_carry_its_own_valve_limits():
+  with pytest.raises(ConfigError, match="valve_limits belongs at the top level"):
+    SystemConfig.from_dict(system(zones=[zone(valve_limits={"min_on_time": 5})]))
 
-  assert all(zone.valve_limits is None for zone in config.zones_for(True))
+
+def test_valve_limits_rejects_unknown_keys():
+  with pytest.raises(ConfigError, match="valve_limits"):
+    SystemConfig.from_dict(system(valve_limits={"min_time": 5}))
 
 
 @pytest.mark.parametrize("field", ["min_on_time", "min_off_time"])
 @pytest.mark.parametrize("value", [0, -1, "5", None, True, float("nan")])
-def test_a_bad_shadow_valve_limit_is_rejected(field, value):
-  with pytest.raises(ConfigError, match=f"shadow: {field} must be a positive number"):
-    SystemConfig.from_dict(system(shadow={"pid": SHADOW_PID, field: value}))
+def test_a_bad_valve_limit_is_rejected(field, value):
+  with pytest.raises(ConfigError, match=f"valve_limits: {field} must be a positive number"):
+    SystemConfig.from_dict(system(valve_limits={field: value}))
 
 
-def test_the_shipped_config_sets_the_valve_limits_in_the_shadow_only():
+def test_the_shipped_config_sets_the_valve_limits_for_every_hydronic_zone():
   config = SystemConfig.from_file(CONFIG_PATH)
 
-  assert config.shadow.valve_limits == ValveLimitsConfig(min_on_time=5, min_off_time=13)
-  assert all(zone.valve_limits is None for zone in config.zones_for(False))
-  assert all(zone.valve_limits is not None for zone in config.zones_for(True) if zone.system == "hydronic")
+  assert config.valve_limits == ValveLimitsConfig(min_on_time=5, min_off_time=13)
+  for shadow in (False, True):
+    zones = config.zones_for(shadow)
+    assert all(zone.valve_limits == config.valve_limits for zone in zones if zone.system == "hydronic")
+    assert all(zone.valve_limits is None for zone in zones if zone.system == "electric")

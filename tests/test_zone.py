@@ -729,8 +729,12 @@ def test_a_shadow_zone_with_limits_converts_minutes_to_seconds(redis_client, gpi
   assert zone.limiter.min_off == 600
 
 
-def test_the_active_zone_has_no_limiter_even_with_limits(redis_client, gpio):
-  assert make_limited_zone(1.0, mode="active").limiter is None
+def test_the_active_zone_builds_a_limiter_from_the_limits(redis_client, gpio):
+  assert make_limited_zone(1.0, mode="active").limiter is not None
+
+
+def test_a_limiter_starts_as_just_closed(redis_client, gpio):
+  assert make_limited_zone(1.0).limiter.age == 0.0
 
 
 def test_an_electric_zone_has_no_limiter(redis_client, gpio):
@@ -796,3 +800,258 @@ def test_a_target_state_of_off_calls_for_nothing_with_limits(redis_client, gpio,
   seed(redis_client, current=18, target=21, state=0)
 
   assert shadow_states(redis_client, run_ticks, make_limited_zone(1.0), 10) == [0] * 10
+
+
+def make_live_zone(value, limits=LIMITS, system="hydronic", **changes):
+  zone = make_limited_zone(value, system=system, mode="active", limits=limits, **changes)
+  zone.outputs = [RecordingOutput()]
+  return zone
+
+
+def live_values(run_ticks, zone, ticks, on_tick=None):
+  seen = []
+
+  def record():
+    seen.append(zone.outputs[0].values[-1] if zone.outputs[0].values else None)
+    if on_tick:
+      on_tick(len(seen))
+
+  run_ticks(zone, ticks, on_tick=record)
+  return seen
+
+
+def test_a_live_zone_waits_the_off_time_after_a_start(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20, target=21, state=1)
+
+  values = live_values(run_ticks, make_live_zone(0.5), 120 * 2)
+
+  assert values[:155] == [0] * 155
+  assert values[156] == 1
+
+
+def test_a_live_zone_never_opens_for_less_than_the_minimum_on_time(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20.9, target=21, state=1)
+
+  values = live_values(run_ticks, make_live_zone(0.1), 120 * 12)
+
+  lengths = []
+  length = 0
+  for value in values:
+    if value == 1:
+      length += 1
+    elif length:
+      lengths.append(length)
+      length = 0
+  assert lengths
+  assert all(length * 5 >= 300 for length in lengths)
+  assert abs(sum(values) - 0.1 * len(values)) <= 0.05 * len(values)
+
+
+def test_a_live_zone_waits_the_off_time_before_it_reopens(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20, target=21, state=1)
+
+  values = live_values(run_ticks, make_live_zone(0.5), 120 * 6)
+
+  closes = [index for index in range(1, len(values)) if values[index] == 0 and values[index - 1] == 1]
+  opens = [index for index in range(1, len(values)) if values[index] == 1 and values[index - 1] == 0]
+  assert closes
+  for close in closes:
+    later = [index for index in opens if index > close]
+    if later:
+      assert (later[0] - close) * 5 >= 780
+
+
+def test_boost_opens_a_live_valve_at_once_and_ignores_the_minimums(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20.9, target=21, state=1)
+  redis_client.set(f"{SENSOR}/boost", "true")
+  zone = make_live_zone(0.0)
+
+  def end_boost(tick):
+    if tick == 3:
+      redis_client.set(f"{SENSOR}/boost", "false")
+
+  values = live_values(run_ticks, zone, 6, on_tick=end_boost)
+
+  assert values == [1, 1, 1, 0, 0, 0]
+
+
+def test_turning_a_live_zone_off_closes_it_at_once(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20, target=21, state=1)
+  zone = make_live_zone(1.0)
+  zone.limiter.age = 10000
+
+  def turn_off(tick):
+    if tick == 4:
+      redis_client.set(f"{SENSOR}/target_heatingcooling_state", 0)
+
+  values = live_values(run_ticks, zone, 8, on_tick=turn_off)
+
+  assert values == [1, 1, 1, 1, 0, 0, 0, 0]
+  assert zone.limiter.age < 300
+
+
+def test_the_off_time_runs_after_a_live_zone_is_turned_off(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20, target=21, state=1)
+  zone = make_live_zone(1.0)
+  zone.limiter.age = 10000
+
+  def toggle(tick):
+    if tick == 4:
+      redis_client.set(f"{SENSOR}/target_heatingcooling_state", 0)
+    if tick == 6:
+      redis_client.set(f"{SENSOR}/target_heatingcooling_state", 1)
+
+  values = live_values(run_ticks, zone, 20, on_tick=toggle)
+
+  assert values[6:] == [0] * 14
+
+
+def test_a_missing_target_state_closes_a_live_valve_at_once(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20, target=21, state=1)
+  zone = make_live_zone(1.0)
+  zone.limiter.age = 10000
+
+  def remove(tick):
+    if tick == 3:
+      redis_client.delete(f"{SENSOR}/target_heatingcooling_state")
+
+  values = live_values(run_ticks, zone, 6, on_tick=remove)
+
+  assert values == [1, 1, 1, 0, 0, 0]
+  assert zone.limiter.open is False
+
+
+def test_a_stale_sensor_closes_a_live_valve_at_once(redis_client, gpio, run_ticks, monkeypatch):
+  seed(redis_client, current=20, target=21, state=1)
+  clock = [1000.0]
+  monkeypatch.setattr(zone_module, "monotonic", lambda: clock[0])
+  zone = make_live_zone(1.0)
+  zone.limiter.age = 10000
+
+  def age_the_sensor(tick):
+    if tick == 3:
+      clock[0] += 3 * 60 * 60
+
+  values = live_values(run_ticks, zone, 6, on_tick=age_the_sensor)
+
+  assert values == [1, 1, 1, 0, 0, 0]
+  assert zone.limiter.age < 300
+
+
+def test_a_missing_reading_keeps_a_live_valve_closed(redis_client, gpio, run_ticks):
+  seed(redis_client, target=21, state=1)
+  zone = make_live_zone(1.0)
+  zone.limiter.age = 10000
+
+  assert live_values(run_ticks, zone, 5) == [0] * 5
+
+
+def test_deactivating_the_outputs_closes_the_limiter_with_the_off_timer_running(redis_client, gpio):
+  zone = make_live_zone(1.0)
+  zone.limiter.open = True
+  zone.limiter.age = 400
+
+  zone.deactivate_outputs()
+
+  assert zone.limiter.open is False
+  assert zone.limiter.age == 0.0
+
+
+def test_deactivating_a_closed_valve_keeps_its_off_timer(redis_client, gpio):
+  zone = make_live_zone(1.0)
+  zone.limiter.age = 400
+
+  zone.deactivate_outputs()
+
+  assert zone.limiter.age == 400
+
+
+def test_three_failed_ticks_close_the_limiter(redis_client, gpio, run_ticks, monkeypatch):
+  seed(redis_client, current=20, target=21, state=1)
+  zone = make_live_zone(1.0)
+  zone.limiter.age = 10000
+  live_values(run_ticks, zone, 3)
+  assert zone.limiter.open is True
+
+  monkeypatch.setattr(zone.redis, "get", lambda key: (_ for _ in ()).throw(ConnectionError("redis is down")))
+  run_ticks(zone, 3)
+
+  assert zone.limiter.open is False
+  assert zone.limiter.age == 0.0
+
+
+def test_an_electric_live_zone_ignores_the_limits(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20.9, target=21, state=1)
+  zone = make_limited_zone(0.1, system="electric", mode="active", outputs=(RELAY,))
+  zone.outputs = [RecordingOutput()]
+
+  values = live_values(run_ticks, zone, 120)
+
+  assert zone.limiter is None
+  assert values == [1] * 12 + [0] * 108
+
+
+def reference_state(control, cycle, target_state, boost, duration=120):
+  if boost:
+    return 1
+  return 1 if target_state == 1 and int(control * duration) > cycle else 0
+
+
+def week_like_script():
+  controls = [0.0, 0.03, 0.1, 0.3, 0.5, 0.8, 1.0, 0.45, 0.07, 0.0]
+  script = []
+  for tick in range(120 * 60):
+    control = controls[(tick // 97) % len(controls)]
+    target_state = 0 if 1500 <= tick % 2500 < 1700 else 1
+    boost = 3000 <= tick < 3100 or 5000 <= tick < 5024
+    script.append((control, target_state, boost))
+  return script
+
+
+def drive(redis_client, run_ticks, zone, script):
+  index = 0
+  states = []
+
+  def step():
+    nonlocal index
+    states.append(zone.outputs[0].values[-1])
+    index += 1
+    if index < len(script):
+      apply(script[index])
+
+  def apply(entry):
+    control, target_state, boost = entry
+    zone.pid.value = control
+    redis_client.set(f"{SENSOR}/target_heatingcooling_state", target_state)
+    redis_client.set(f"{SENSOR}/boost", "true" if boost else "false")
+
+  apply(script[0])
+  run_ticks(zone, len(script), on_tick=step)
+  return states
+
+
+def test_a_live_zone_without_limits_decides_as_the_duty_window_alone(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20, target=21, state=1)
+  script = week_like_script()
+  zone = make_live_zone(0.0, limits=None)
+
+  states = drive(redis_client, run_ticks, zone, script)
+
+  cycle = 0
+  expected = []
+  for control, target_state, boost in script:
+    expected.append(reference_state(control, cycle, target_state, boost))
+    cycle = 0 if cycle + 1 > 119 else cycle + 1
+  assert zone.limiter is None
+  assert states == expected
+  assert sum(expected) > 0
+
+
+def test_a_live_zone_and_a_shadow_zone_decide_alike(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20, target=21, state=1)
+  script = week_like_script()
+  live = make_live_zone(0.0)
+  shadow = make_limited_zone(0.0)
+  shadow.outputs = [RecordingOutput()]
+
+  assert drive(redis_client, run_ticks, live, script) == drive(redis_client, run_ticks, shadow, script)
