@@ -11,6 +11,7 @@ from boiler_relay.heating_cooling_state import HeatingCoolingState
 from boiler_relay.outputs import create_output
 from boiler_relay.pid import PID
 from boiler_relay.state_publisher import ACTIVE, SHADOW, StatePublisher
+from boiler_relay.valve_limiter import ValveLimiter
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +39,11 @@ class Zone(Thread):
         self.interval = 5
         self.cycle = 0
         self.duration = zone_config.control_interval * 60 / self.interval
+
+        self.limiter = None
+        if self.shadow and self.system == "hydronic" and zone_config.valve_limits is not None:
+            limits = zone_config.valve_limits
+            self.limiter = ValveLimiter(self.name, limits.min_on_time * 60, limits.min_off_time * 60)
 
         self.outputs = []
         if not self.shadow:
@@ -115,11 +121,13 @@ class Zone(Thread):
 
         target_state = self.read_target_state()
         if target_state is None:
+            if self.limiter:
+                self.limiter.advance(self.interval)
             self.publisher.zone(self.name, self.system, self.control_value, None, asdict(self.gains),
                                 **self.confirmation())
             return
 
-        state = self.duty_state(target_state)
+        state = self.limited_state(self.duty_state(target_state), target_state)
         for output in self.outputs:
             output.activate(state.value)
 
@@ -206,10 +214,19 @@ class Zone(Thread):
         if target_state == HeatingCoolingState.HEAT and on_time > self.cycle:
             state = HeatingCoolingState.HEAT
 
-        boost = self.read_json(f'{self.input_path}/boost')
-        if boost == True:
-            state = HeatingCoolingState.HEAT
         return state
+
+    def limited_state(self, state, target_state):
+        boost = self.read_json(f'{self.input_path}/boost') == True
+        if self.limiter is None:
+            return HeatingCoolingState.HEAT if boost else state
+        calling = target_state == HeatingCoolingState.HEAT and self.control_value > 0
+        on_ticks = int(self.control_value * self.duration)
+        pending = max(0, on_ticks - self.cycle - 1) * self.interval if calling else 0
+        demand = state == HeatingCoolingState.HEAT
+        if self.limiter.step(demand, calling, self.interval, pending, boost=boost):
+            return HeatingCoolingState.HEAT
+        return HeatingCoolingState.OFF
 
     def record(self, state):
         if state != self.state:

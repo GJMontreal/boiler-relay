@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from boiler_relay.config import (BoilerConfig, ConfigError, MQTTConfig, PIDConfig, RedisConfig,
-                                 SystemConfig, ZoneConfig)
+                                 SystemConfig, ValveLimitsConfig, ZoneConfig)
 
 CONFIG_PATH = Path(__file__).resolve().parent.parent / "config" / "system_config.json"
 
@@ -556,3 +556,45 @@ def test_a_config_without_site_name_loads_as_before():
 
 def test_the_shipped_config_names_the_site_generically():
   assert SystemConfig.from_file(CONFIG_PATH).site_name == "Heating"
+
+
+def test_the_shadow_valve_limits_default_to_five_and_thirteen_minutes():
+  config = SystemConfig.from_dict(system(shadow={"pid": SHADOW_PID}))
+
+  assert config.shadow.valve_limits == ValveLimitsConfig(min_on_time=5, min_off_time=13)
+
+
+def test_the_shadow_valve_limits_are_read_from_the_config():
+  config = SystemConfig.from_dict(system(shadow={"pid": SHADOW_PID, "min_on_time": 4, "min_off_time": 10}))
+
+  assert config.shadow.valve_limits == ValveLimitsConfig(min_on_time=4, min_off_time=10)
+
+
+def test_the_shadow_valve_limits_reach_hydronic_zones_in_shadow_mode_only():
+  config = SystemConfig.from_dict(system(zones=[ZONE, ELECTRIC_ZONE], shadow={"pid": SHADOW_PID}))
+
+  hydronic, electric = config.zones_for(True)
+  assert hydronic.valve_limits == ValveLimitsConfig()
+  assert electric.valve_limits is None
+  assert all(zone.valve_limits is None for zone in config.zones_for(False))
+
+
+def test_a_config_without_a_shadow_section_sets_no_valve_limits():
+  config = SystemConfig.from_dict(system())
+
+  assert all(zone.valve_limits is None for zone in config.zones_for(True))
+
+
+@pytest.mark.parametrize("field", ["min_on_time", "min_off_time"])
+@pytest.mark.parametrize("value", [0, -1, "5", None, True, float("nan")])
+def test_a_bad_shadow_valve_limit_is_rejected(field, value):
+  with pytest.raises(ConfigError, match=f"shadow: {field} must be a positive number"):
+    SystemConfig.from_dict(system(shadow={"pid": SHADOW_PID, field: value}))
+
+
+def test_the_shipped_config_sets_the_valve_limits_in_the_shadow_only():
+  config = SystemConfig.from_file(CONFIG_PATH)
+
+  assert config.shadow.valve_limits == ValveLimitsConfig(min_on_time=5, min_off_time=13)
+  assert all(zone.valve_limits is None for zone in config.zones_for(False))
+  assert all(zone.valve_limits is not None for zone in config.zones_for(True) if zone.system == "hydronic")

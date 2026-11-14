@@ -69,6 +69,18 @@ class PIDConfig(Config):
       raise ConfigError(f"pid integral_cap must be a number from 0 to 1, found {self.integral_cap!r}")
 
 @dataclass
+class ValveLimitsConfig(Config):
+  min_on_time: float = 5.0
+  min_off_time: float = 13.0
+
+  def __post_init__(self):
+    for field in ("min_on_time", "min_off_time"):
+      value = getattr(self, field)
+      if not is_number(value) or value <= 0:
+        raise ConfigError(f"{field} must be a positive number of minutes, found {value!r}")
+      setattr(self, field, float(value))
+
+@dataclass
 class ZoneConfig(Config):
   sensor_path: str
   name: str
@@ -78,6 +90,7 @@ class ZoneConfig(Config):
   control_interval: float = 10.0
   active_low: bool = False
   pid: PIDConfig = None
+  valve_limits: ValveLimitsConfig = None
 
   def __post_init__(self):
     self.pid_interval = float(self.pid_interval)
@@ -121,6 +134,9 @@ class RelayConfig(Config):
 @dataclass
 class ShadowConfig(Config):
   pid: PIDConfig
+  min_on_time: float = 5.0
+  min_off_time: float = 13.0
+  valve_limits: ValveLimitsConfig = None
 
   def __post_init__(self):
     if not isinstance(self.pid, PIDConfig):
@@ -128,6 +144,10 @@ class ShadowConfig(Config):
         self.pid = PIDConfig(**(self.pid or {}))
       except ConfigError as error:
         raise ConfigError(f"shadow: {error}")
+    try:
+      self.valve_limits = ValveLimitsConfig(self.min_on_time, self.min_off_time)
+    except ConfigError as error:
+      raise ConfigError(f"shadow: {error}")
 
 SITE_NAME_LIMIT = 60
 SECTIONS = {"redis", "boiler", "zones", "mqtt", "shadow", "pid", "site_name"}
@@ -236,4 +256,5 @@ class SystemConfig(Config):
   def zones_for(self, shadow) -> list[ZoneConfig]:
     if not shadow or self.shadow is None:
       return self.zones
-    return [replace(zone, pid=self.shadow.pid) if zone.system == HYDRONIC else zone for zone in self.zones]
+    return [replace(zone, pid=self.shadow.pid, valve_limits=self.shadow.valve_limits)
+            if zone.system == HYDRONIC else zone for zone in self.zones]

@@ -72,6 +72,18 @@ An optional top-level `pid` block sets the default gains for every zone that has
 
 An optional top-level `shadow` section holds a `pid` block. In shadow mode it replaces the `pid` of every hydronic zone, whatever the zone block or the top-level `pid` says. The active service ignores it. An electric zone in shadow mode follows the same precedence as the active service. The shipped config sets the shadow to Kp 1, Ki 0.001, Kd 0 and a cap of 0.3, so the shadow runs candidate gains while the legacy controller keeps its own.
 
+The `shadow` section also takes `min_on_time` and `min_off_time` in minutes, with defaults of 5 and 13. Both must be positive numbers, and a bad value stops the program at load with a message that starts with `shadow`. They apply to hydronic zones in shadow mode only. The active service and electric zones ignore them. Moving them to the top level later means reading them in `SystemConfig.from_dict` into each zone's `valve_limits` instead of in `zones_for`.
+
+The limits come from valve travel. The end switch rises 3.5 to 3.9 minutes after an open command and falls 8 to 13 minutes after a close command, so a call shorter than the travel never delivers heat, and the next window can start before the last valve has closed. `boiler_relay/valve_limiter.py` holds the rule, and it runs on the decision the duty window already made:
+
+- A call shorter than `min_on_time` waits. The limiter adds each tick of demand to an accumulator while the valve is closed. It opens the valve once the accumulator, plus the demand the window still has to give, reaches `min_on_time`. A call that will last the minimum opens at once.
+- A valve that opened stays open for at least `min_on_time`. While it is open, each tick without demand pays down the accumulator, and the valve closes when the accumulator is empty and the minimum has passed.
+- A valve stays closed for `min_off_time`, counted from the close command and not from the end switch, because the shadow reads no end switch. Demand that arrives during the wait accumulates and opens the valve when the wait ends. The first open after start has no wait.
+- The accumulator empties when the target state is not heat or the control value is zero, so heat nobody wants anymore is not delivered later. It also empties on boost.
+- Boost opens the valve at once and ignores both minimums. When boost ends the valve closes unless demand holds it open, and the off time counts from that close.
+
+The mean heat follows the PID. The valve delivers what it accumulated, and it stays open longer than the demand only to reach the minimum, which the accumulator then forgets. The log gets one info line when a minimum holds a command back, when a valve is held open to its minimum, and when accumulated demand is released. Each hold logs once. The published keys are unchanged. The shadow's `state` is the limited decision, and `control_value` is still the PID output.
+
 The end switch pairing is verified on the device for all five valves, by boost tests read through sysfs on 2026-11-07.
 
 - **Common and Kitchen** were swapped in the old config. Common's valve (`P8_8`) reports on `P8_15` and Kitchen's valve (`P8_16`) reports on `P8_7`, so the config pairs them that way.

@@ -6,7 +6,7 @@ from threading import Thread
 import pytest
 
 from boiler_relay import zone as zone_module
-from boiler_relay.config import MQTTConfig, RedisConfig, ZoneConfig
+from boiler_relay.config import MQTTConfig, RedisConfig, ValveLimitsConfig, ZoneConfig
 from boiler_relay.outputs import GPIOOutput, MQTTRelay
 from boiler_relay.zone import Zone
 
@@ -699,3 +699,100 @@ def test_a_shadow_zone_publishes_a_null_confirmation(redis_client, gpio, run_tic
   assert data["confirmed"] is None
   assert data["confirmed_time"] is None
   assert data["confirmed_silent"] is None
+
+
+LIMITS = ValveLimitsConfig()
+
+
+def make_limited_zone(value, system="hydronic", mode="shadow", limits=LIMITS, outputs=(VALVE,), **changes):
+  config = ZoneConfig(sensor_path=SENSOR, name="Bedrooms", outputs=list(outputs), pid_interval="10", system=system,
+                      valve_limits=limits, **changes)
+  zone = Zone(config, REDIS, MQTT, mode=mode)
+  zone.pid = FixedPID(value)
+  return zone
+
+
+def shadow_states(redis_client, run_ticks, zone, ticks):
+  states = []
+  run_ticks(zone, ticks, on_tick=lambda: states.append(json.loads(redis_client.get("heating/shadow/zones/Bedrooms"))["state"]))
+  return states
+
+
+def test_a_shadow_zone_without_limits_has_no_limiter(redis_client, gpio):
+  assert make_limited_zone(1.0, limits=None).limiter is None
+
+
+def test_a_shadow_zone_with_limits_converts_minutes_to_seconds(redis_client, gpio):
+  zone = make_limited_zone(1.0, limits=ValveLimitsConfig(min_on_time=4, min_off_time=10))
+
+  assert zone.limiter.min_on == 240
+  assert zone.limiter.min_off == 600
+
+
+def test_the_active_zone_has_no_limiter_even_with_limits(redis_client, gpio):
+  assert make_limited_zone(1.0, mode="active").limiter is None
+
+
+def test_an_electric_zone_has_no_limiter(redis_client, gpio):
+  assert make_limited_zone(1.0, system="electric", outputs=(RELAY,)).limiter is None
+
+
+def test_a_small_control_value_never_opens_a_shadow_valve_for_less_than_the_minimum(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20.9, target=21, state=1)
+  zone = make_limited_zone(0.1)
+
+  states = shadow_states(redis_client, run_ticks, zone, 120 * 10)
+
+  runs = []
+  length = 0
+  for state in states:
+    if state == 1:
+      length += 1
+    elif length:
+      runs.append(length)
+      length = 0
+  assert runs
+  assert all(run * 5 >= 300 for run in runs)
+  assert abs(sum(states) - 0.1 * len(states)) <= 0.1 * len(states) * 0.5
+
+
+def test_the_shadow_zone_off_time_spaces_the_calls(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20, target=21, state=1)
+  zone = make_limited_zone(0.5)
+
+  states = shadow_states(redis_client, run_ticks, zone, 120 * 6)
+
+  edges = [index for index in range(1, len(states)) if states[index] != states[index - 1]]
+  closes = [index for index in edges if states[index] == 0]
+  opens = [index for index in edges if states[index] == 1]
+  for close, reopen in zip(closes, [index for index in opens if index > closes[0]]):
+    assert (reopen - close) * 5 >= 780
+
+
+def test_boost_bypasses_the_shadow_minimums(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20.9, target=21, state=1)
+  redis_client.set(f"{SENSOR}/boost", "true")
+
+  states = shadow_states(redis_client, run_ticks, make_limited_zone(0.0), 3)
+
+  assert states == [1, 1, 1]
+
+
+def test_the_state_follows_the_window_when_no_limits_are_set(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20.9, target=21, state=1)
+
+  states = shadow_states(redis_client, run_ticks, make_limited_zone(0.1, limits=None), 120)
+
+  assert states == [1] * 12 + [0] * 108
+
+
+def test_a_missing_target_state_still_publishes_null_with_limits(redis_client, gpio, run_ticks):
+  seed(redis_client, current=20, target=21)
+
+  assert shadow_states(redis_client, run_ticks, make_limited_zone(1.0), 2) == [None, None]
+
+
+def test_a_target_state_of_off_calls_for_nothing_with_limits(redis_client, gpio, run_ticks):
+  seed(redis_client, current=18, target=21, state=0)
+
+  assert shadow_states(redis_client, run_ticks, make_limited_zone(1.0), 10) == [0] * 10

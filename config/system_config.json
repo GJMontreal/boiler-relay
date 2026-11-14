@@ -85,6 +85,8 @@
         "poll_interval": 5
     },
     "shadow": {
-        "pid": {"kp": 1, "ki": 0.001, "kd": 0, "integral_cap": 0.3}
+        "pid": {"kp": 1, "ki": 0.001, "kd": 0, "integral_cap": 0.3},
+        "min_on_time": 5,
+        "min_off_time": 13
     }
 }
